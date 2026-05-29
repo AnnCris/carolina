@@ -1,0 +1,98 @@
+# ═══════════════════════════════════════════════════════
+# .gitignore — Distribuidora Carolina
+# Coloca este archivo en la raíz del proyecto (carolina/)
+# ═══════════════════════════════════════════════════════
+
+# ─── Python / Flask ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+
+# Entorno virtual
+backend/venv/
+backend/.venv/
+backend/env/
+
+# Variables de entorno (contiene contraseñas y claves)
+backend/.env
+backend/.env.*
+*.env
+
+# Base de datos local
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos subidos por usuarios (fotos de productos, facturas)
+backend/subidas/*
+!backend/subidas/.gitkeep
+
+# Logs de Flask
+backend/*.log
+flask_session/
+base.sql
+base1.sql
+
+# ─── Flutter / Dart ──────────────────────────────────
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/pubspec.lock
+
+# Archivos generados de Android
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/key.properties
+frontend/android/app/google-services.json
+frontend/android/captures/
+
+# Archivos generados de iOS
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Flutter.podspec
+frontend/ios/Runner/GeneratedPluginRegistrant.*
+
+# Archivos generados de Web
+frontend/web/favicon.png
+
+# ─── VS Code ─────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+# Mantener tasks.json si lo tienes configurado
+# !.vscode/tasks.json
+
+# ─── Sistema operativo ───────────────────────────────
+# Windows
+Thumbs.db
+Thumbs.db:encdata
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ─── IDEs ────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.vs/
+
+# ─── Certificados y claves ───────────────────────────
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
