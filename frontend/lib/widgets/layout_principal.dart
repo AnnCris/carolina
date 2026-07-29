@@ -40,6 +40,7 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     final todos = [
       {'icono': Icons.dashboard_rounded,         'titulo': 'Dashboard',    'ruta': RutasApp.dashboard,    'permiso': 'todo'},
       {'icono': Icons.point_of_sale_rounded,     'titulo': 'Ventas',       'ruta': RutasApp.ventas,       'permiso': 'ventas'},
+      {'icono': Icons.price_change_rounded,      'titulo': 'Precios',      'ruta': RutasApp.precios,      'permiso': 'productos'},
       {'icono': Icons.shopping_cart_rounded,     'titulo': 'Compras',      'ruta': RutasApp.compras,      'permiso': 'compras'},
       {'icono': Icons.inventory_2_rounded,       'titulo': 'Inventario',   'ruta': RutasApp.inventario,   'permiso': 'inventario'},
       {'icono': Icons.category_rounded,          'titulo': 'Productos',    'ruta': RutasApp.productos,    'permiso': 'productos'},

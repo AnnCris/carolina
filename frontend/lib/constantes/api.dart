@@ -18,5 +18,8 @@ class ApiConfig {
   static const String pedidos    = '$baseUrl/pedidos';
   static const String devoluciones='$baseUrl/devoluciones';
   static const String usuarios   = '$baseUrl/usuarios';
+  static const String precios = '$baseUrl/precios';
+  static String precioCompra(int productoId) =>
+    '$baseUrl/precios/producto/$productoId/compra';
   
 }

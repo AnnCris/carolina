@@ -13,7 +13,8 @@ import '../pantallas/categorias/categorias_pantalla.dart';
 import '../pantallas/marcas/marcas_pantalla.dart';
 import '../pantallas/proveedores/proveedores_pantalla.dart';
 import '../pantallas/compras/compras_pantalla.dart';
-
+import '../pantallas/pedidos/pedidos_pantalla.dart';
+import '../pantallas/precios/precios_pantalla.dart';
 
 class RutasApp {
   static const String login        = '/';
@@ -30,6 +31,7 @@ class RutasApp {
   static const String usuarios     = '/usuarios';
   static const String categorias = '/categorias';
   static const String marcas     = '/marcas';
+  static const String precios    = '/precios';
 
   static Map<String, WidgetBuilder> get rutas => {
     login:    (_) => const LoginPantalla(),
@@ -49,8 +51,8 @@ class RutasApp {
         titulo: 'Clientes', hijo: ClientesPantalla()),
     proveedores: (_) => const LayoutPrincipal(
       titulo: 'Proveedores', hijo: ProveedoresPantalla()),  
-    pedidos: (_) => LayoutPrincipal(
-        titulo: 'Pedidos', hijo: _placeholder('Pedidos')),
+    pedidos: (_) => const LayoutPrincipal(
+      titulo: 'Pedidos', hijo: PedidosPantalla()),
     devoluciones: (_) => LayoutPrincipal(
         titulo: 'Devoluciones', hijo: _placeholder('Devoluciones')),
     usuarios: (_) => const LayoutPrincipal(
@@ -59,6 +61,8 @@ class RutasApp {
         titulo: 'Categorías', hijo: CategoriasPantalla()),
     marcas: (_) => const LayoutPrincipal(
         titulo: 'Marcas', hijo: MarcasPantalla()),
+    precios: (_) => const LayoutPrincipal(
+        titulo: 'Precios', hijo: PreciosPantalla()),
   };
 
   static Widget _placeholder(String nombre) => Center(
