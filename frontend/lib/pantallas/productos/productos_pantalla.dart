@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import '../../constantes/breakpoints.dart';
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
 import '../../servicios/auth_servicio.dart';
@@ -29,6 +30,12 @@ class ProductosServicio {
     final res = await http.get(Uri.parse(ApiConfig.marcas), headers: await _h);
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Error al cargar marcas');
+  }
+
+  Future<List<dynamic>> listarProveedores() async {
+    final res = await http.get(Uri.parse(ApiConfig.proveedores), headers: await _h);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Error al cargar proveedores');
   }
 
   Future<Map<String, dynamic>> crear(Map<String, dynamic> datos) async {
@@ -92,9 +99,10 @@ class ProductosPantalla extends StatefulWidget {
 
 class _ProductosPantallaState extends State<ProductosPantalla> {
   final _servicio   = ProductosServicio();
-  List<dynamic> _productos  = [];
-  List<dynamic> _categorias = [];
-  List<dynamic> _marcas     = [];
+  List<dynamic> _productos   = [];
+  List<dynamic> _categorias  = [];
+  List<dynamic> _marcas      = [];
+  List<dynamic> _proveedores = [];
   bool   _cargando          = true;
   String _busqueda          = '';
   String _filtroEstado      = 'todos';
@@ -106,10 +114,11 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final p = await _servicio.listar();
-      final c = await _servicio.listarCategorias();
-      final m = await _servicio.listarMarcas();
-      setState(() { _productos = p; _categorias = c; _marcas = m; });
+      final p  = await _servicio.listar();
+      final c  = await _servicio.listarCategorias();
+      final m  = await _servicio.listarMarcas();
+      final pv = await _servicio.listarProveedores();
+      setState(() { _productos = p; _categorias = c; _marcas = m; _proveedores = pv; });
     } catch (e) {
       if (mounted) Notificacion.error(context, e.toString().replaceAll('Exception: ', ''));
     } finally {
@@ -129,8 +138,7 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
       final q = _busqueda.toLowerCase();
       return (p['nombre'] ?? '').toLowerCase().contains(q) ||
              (p['categoria'] ?? '').toLowerCase().contains(q) ||
-             (p['marca'] ?? '').toLowerCase().contains(q) ||
-             (p['codigo_barras'] ?? '').toLowerCase().contains(q);
+             (p['marca'] ?? '').toLowerCase().contains(q);
     }).toList();
   }
 
@@ -213,6 +221,7 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
     context: context, barrierDismissible: false,
     builder: (_) => _FormularioProducto(
       producto: producto, categorias: _categorias, marcas: _marcas,
+      proveedores: _proveedores,
       servicio: _servicio,
       onGuardado: () {
         Navigator.pop(context);
@@ -232,56 +241,64 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
     ]);
   }
 
-  Widget _buildHeader() => Container(
-    padding: const EdgeInsets.fromLTRB(28, 22, 28, 18),
-    decoration: const BoxDecoration(color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
-    child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Gestión de Productos', style: TextStyle(fontSize: 24,
-            fontWeight: FontWeight.bold, color: ColoresCarolina.celesteOscuro)),
-        const SizedBox(height: 6),
-        Row(children: [
-          _chip('${_productos.length} total', ColoresCarolina.celeste),
-          const SizedBox(width: 6),
-          _chip('$_totalActivos activos', Colors.green),
-          const SizedBox(width: 6),
-          _chip('$_totalInactivos inactivos', Colors.grey),
-        ]),
-      ])),
-      ElevatedButton.icon(
-        onPressed: () => _abrirFormulario(),
-        icon: const Icon(Icons.add_rounded, size: 18),
-        label: const Text('Nuevo Producto'),
-        style: ElevatedButton.styleFrom(backgroundColor: ColoresCarolina.celeste,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-      ),
-    ]),
-  );
+  Widget _buildHeader() {
+    final esMovil = Breakpoints.esMovil(context);
+    final titulo = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Gestión de Productos', style: TextStyle(fontSize: 24,
+          fontWeight: FontWeight.bold, color: ColoresCarolina.celesteOscuro)),
+      const SizedBox(height: 4),
+      const Text('Administra el catálogo: precios, stock, categorías y marcas.',
+          style: TextStyle(fontSize: 12.5, color: ColoresCarolina.grisMedio)),
+      const SizedBox(height: 8),
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        _chip('${_productos.length} total', ColoresCarolina.celeste),
+        _chip('$_totalActivos activos', Colors.green),
+        _chip('$_totalInactivos inactivos', Colors.grey),
+      ]),
+    ]);
+    final boton = ElevatedButton.icon(
+      onPressed: () => _abrirFormulario(),
+      icon: const Icon(Icons.add_rounded, size: 18),
+      label: const Text('Nuevo Producto'),
+      style: ElevatedButton.styleFrom(backgroundColor: ColoresCarolina.celeste,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+    );
 
-  Widget _buildBarra() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-    color: Colors.white,
-    child: Row(children: [
-      Expanded(child: TextField(
-        onChanged: (v) => setState(() => _busqueda = v),
-        decoration: InputDecoration(
-          hintText: 'Buscar por nombre, categoría, marca o código...',
-          prefixIcon: const Icon(Icons.search_rounded, color: ColoresCarolina.celeste),
-          suffixIcon: _busqueda.isNotEmpty
-              ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18),
-                  onPressed: () => setState(() => _busqueda = '')) : null,
-          filled: true, fillColor: const Color(0xFFF1F5F9),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: ColoresCarolina.celeste, width: 1.5)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      )),
-      const SizedBox(width: 12),
+    return Container(
+      padding: EdgeInsets.fromLTRB(esMovil ? 16 : 28, 22, esMovil ? 16 : 28, 18),
+      decoration: const BoxDecoration(color: Colors.white,
+          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+      child: esMovil
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              titulo,
+              const SizedBox(height: 14),
+              SizedBox(width: double.infinity, child: boton),
+            ])
+          : Row(children: [Expanded(child: titulo), boton]),
+    );
+  }
+
+  Widget _buildBarra() {
+    final buscador = TextField(
+      onChanged: (v) => setState(() => _busqueda = v),
+      decoration: InputDecoration(
+        hintText: 'Buscar por nombre, categoría, marca o código...',
+        prefixIcon: const Icon(Icons.search_rounded, color: ColoresCarolina.celeste),
+        suffixIcon: _busqueda.isNotEmpty
+            ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18),
+                tooltip: 'Limpiar búsqueda',
+                onPressed: () => setState(() => _busqueda = '')) : null,
+        filled: true, fillColor: const Color(0xFFF1F5F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: ColoresCarolina.celeste, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+    );
+    final controles = [
       if (_categorias.isNotEmpty)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -297,7 +314,6 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
             onChanged: (v) => setState(() => _filtroCategoria = v ?? 'todas'),
           )),
         ),
-      const SizedBox(width: 8),
       Container(
         decoration: BoxDecoration(color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10)),
@@ -307,11 +323,37 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
           _btnFiltro('Inactivos', 'inactivos', Icons.cancel_rounded),
         ]),
       ),
-      const SizedBox(width: 8),
       IconButton(onPressed: _cargar, icon: const Icon(Icons.refresh_rounded),
           color: ColoresCarolina.celeste, tooltip: 'Actualizar'),
-    ]),
-  );
+    ];
+
+    if (Breakpoints.esMovil(context)) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: Colors.white,
+        child: Column(children: [
+          buscador,
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (final c in controles) ...[c, const SizedBox(width: 8)],
+            ]),
+          ),
+        ]),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+      color: Colors.white,
+      child: Row(children: [
+        Expanded(child: buscador),
+        const SizedBox(width: 12),
+        for (final c in controles) ...[c, const SizedBox(width: 8)],
+      ]),
+    );
+  }
 
   Widget _btnFiltro(String label, String valor, IconData icono) {
     final sel = _filtroEstado == valor;
@@ -347,6 +389,24 @@ class _ProductosPantallaState extends State<ProductosPantalla> {
             style: const TextStyle(color: ColoresCarolina.grisMedio, fontSize: 15)),
       ]));
     }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final p = filtrados[i];
+          return _TarjetaProductoMovil(
+            producto:   p,
+            onVer:      () => _verDetalle(p),
+            onEditar:   () => _abrirFormulario(producto: p),
+            onEstado:   () => _cambiarEstado(p),
+            onEliminar: () => _eliminar(p),
+          );
+        },
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Card(
@@ -446,8 +506,6 @@ class _FilaProducto extends StatelessWidget {
                 overflow: TextOverflow.ellipsis),
             if (producto['marca'] != null)
               Text(producto['marca'], style: const TextStyle(fontSize: 11, color: ColoresCarolina.grisMedio)),
-            if (producto['codigo_barras'] != null)
-              Text('Cód: ${producto['codigo_barras']}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
           ])),
         ])),
         Expanded(flex: 2, child: Container(
@@ -488,6 +546,136 @@ class _FilaProducto extends StatelessWidget {
       ]),
     );
   }
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) => Tooltip(
+    message: tip,
+    child: InkWell(onTap: fn, borderRadius: BorderRadius.circular(8),
+      child: Container(padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Icon(i, size: 16, color: c))),
+  );
+}
+
+// ─── Tarjeta móvil ────────────────────────────────────────────────────────────
+class _TarjetaProductoMovil extends StatelessWidget {
+  final Map<String, dynamic> producto;
+  final VoidCallback onVer, onEditar, onEstado, onEliminar;
+
+  const _TarjetaProductoMovil({required this.producto,
+      required this.onVer, required this.onEditar,
+      required this.onEstado, required this.onEliminar});
+
+  ImageProvider? get _img {
+    final f = producto['foto'] as String?;
+    if (f == null || f.isEmpty) return null;
+    return NetworkImage(_ProductosPantallaState.urlFoto(f));
+  }
+
+  String get _pesoLabel {
+    final tipo   = producto['tipo_peso'] as String? ?? 'fijo';
+    final peso   = producto['peso_gramos'];
+    final unidad = producto['unidad']    as String? ?? 'gr';
+    if (tipo == 'variable') return 'Variable (kg)';
+    if (peso == null) return unidad;
+    final g = double.tryParse(peso.toString()) ?? 0;
+    if (unidad == 'kg') return '${g.toStringAsFixed(2)} kg';
+    if (g >= 1000) return '${(g / 1000).toStringAsFixed(2)} kg';
+    return '${g.toStringAsFixed(0)} gr';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activo  = producto['activo'] as bool? ?? false;
+    final stock   = double.tryParse((producto['stock'] ?? 0).toString()) ?? 0;
+    final imgProv = _img;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(width: 44, height: 44,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8),
+                  color: ColoresCarolina.grisClaro),
+              child: ClipRRect(borderRadius: BorderRadius.circular(8),
+                child: imgProv != null
+                    ? Image(image: imgProv, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_outlined,
+                            color: ColoresCarolina.celeste, size: 22))
+                    : const Icon(Icons.inventory_2_outlined, color: ColoresCarolina.celeste, size: 22),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(producto['nombre'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  overflow: TextOverflow.ellipsis),
+              if (producto['marca'] != null)
+                Text(producto['marca'], style: const TextStyle(fontSize: 11, color: ColoresCarolina.grisMedio)),
+            ])),
+            Container(width: 8, height: 8, margin: const EdgeInsets.only(left: 6),
+                decoration: BoxDecoration(shape: BoxShape.circle,
+                    color: activo ? Colors.green : Colors.grey)),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: ColoresCarolina.celeste.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(producto['categoria'] ?? '-',
+                  style: const TextStyle(fontSize: 11, color: ColoresCarolina.celeste,
+                      fontWeight: FontWeight.w600)),
+            ),
+            _dato(Icons.scale_rounded, _pesoLabel),
+            _dato(stock <= 5 ? Icons.warning_amber_rounded : Icons.inventory_rounded,
+                'Stock: ${stock % 1 == 0 ? stock.toStringAsFixed(0) : stock.toStringAsFixed(2)}',
+                color: stock <= 5 ? Colors.orange : null),
+            _dato(activo ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                activo ? 'Activo' : 'Inactivo',
+                color: activo ? Colors.green : Colors.grey),
+            if ((producto['proveedores'] as List?)?.isNotEmpty == true)
+              _dato(Icons.local_shipping_outlined,
+                  (producto['proveedores'] as List).length == 1
+                      ? '1 proveedor'
+                      : '${(producto['proveedores'] as List).length} proveedores'),
+          ]),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _btn(Icons.visibility_rounded, ColoresCarolina.celeste, 'Ver', onVer),
+              const SizedBox(width: 4),
+              _btn(Icons.edit_rounded, Colors.orange, 'Editar', onEditar),
+              const SizedBox(width: 4),
+              _btn(activo ? Icons.inventory_2_rounded : Icons.check_circle_rounded,
+                  activo ? Colors.amber.shade700 : Colors.green,
+                  activo ? 'Desactivar' : 'Activar', onEstado),
+              const SizedBox(width: 4),
+              _btn(Icons.delete_rounded, ColoresCarolina.rojo, 'Eliminar', onEliminar),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dato(IconData i, String t, {Color? color}) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(i, size: 14, color: color ?? ColoresCarolina.grisMedio),
+      const SizedBox(width: 4),
+      Text(t, style: TextStyle(fontSize: 12.5,
+          fontWeight: color != null ? FontWeight.w600 : FontWeight.normal,
+          color: color ?? const Color(0xFF475569))),
+    ],
+  );
 
   Widget _btn(IconData i, Color c, String tip, VoidCallback fn) => Tooltip(
     message: tip,
@@ -576,7 +764,11 @@ class _DetalleProducto extends StatelessWidget {
               _fila(Icons.category_outlined,    'Categoría',   producto['categoria']     ?? '-'),
               _fila(Icons.branding_watermark,   'Marca',       producto['marca']         ?? '-'),
               _fila(Icons.scale_rounded,        'Peso/Unidad', _pesoLabel),
-              _fila(Icons.qr_code_rounded,      'Cód. barras', producto['codigo_barras'] ?? '-'),
+              _fila(Icons.local_shipping_outlined, 'Proveedores', () {
+                final nombres = ((producto['proveedores'] as List?) ?? [])
+                    .map((p) => p['nombre']).join(', ');
+                return nombres.isEmpty ? 'Sin proveedores asignados' : nombres;
+              }()),
               if ((producto['descripcion'] ?? '').toString().isNotEmpty)
                 _fila(Icons.description_outlined, 'Descripción', producto['descripcion']),
             ]),
@@ -621,13 +813,14 @@ class _DetalleProducto extends StatelessWidget {
 // ─── Formulario ───────────────────────────────────────────────────────────────
 class _FormularioProducto extends StatefulWidget {
   final Map<String, dynamic>? producto;
-  final List<dynamic> categorias, marcas;
+  final List<dynamic> categorias, marcas, proveedores;
   final ProductosServicio servicio;
   final VoidCallback onGuardado;
-  final Future<void> Function() onNuevaCategoria;  
+  final Future<void> Function() onNuevaCategoria;
   final Future<void> Function() onNuevaMarca;
 
   const _FormularioProducto({this.producto, required this.categorias, required this.marcas,
+      required this.proveedores,
       required this.servicio, required this.onGuardado,
       required this.onNuevaCategoria, required this.onNuevaMarca});
 
@@ -639,12 +832,12 @@ class _FormularioProductoState extends State<_FormularioProducto> {
   final _formKey      = GlobalKey<FormState>();
   final _nombreCtrl   = TextEditingController();
   final _descCtrl     = TextEditingController();
-  final _codigoCtrl   = TextEditingController();
   final _pesoCtrl     = TextEditingController();
   final _stockMinCtrl = TextEditingController();
 
   int?             _categoriaId;
   int?             _marcaId;
+  Set<int>         _proveedorIds = {};
   late List<dynamic> _categoriasLocal;
   late List<dynamic> _marcasLocal;
   String     _tipoPeso = 'fijo';
@@ -681,12 +874,13 @@ class _FormularioProductoState extends State<_FormularioProducto> {
       final p = widget.producto!;
       _nombreCtrl.text  = p['nombre']        ?? '';
       _descCtrl.text    = p['descripcion']   ?? '';
-      _codigoCtrl.text  = p['codigo_barras'] ?? '';
       _tipoPeso         = p['tipo_peso']     ?? 'fijo';
       _unidad           = p['unidad']        ?? 'gr';
       _activo           = p['activo']        ?? true;
       _categoriaId      = p['categoria_id']  as int?;
       _marcaId          = p['marca_id']      as int?;
+      _proveedorIds     = ((p['proveedor_ids'] as List?) ?? [])
+          .map((e) => e as int).toSet();
       if (p['peso_gramos'] != null) {
         _pesoCtrl.text = p['peso_gramos'].toString();
       }
@@ -697,7 +891,6 @@ class _FormularioProductoState extends State<_FormularioProducto> {
   void dispose() {
     _nombreCtrl.dispose();
     _descCtrl.dispose();
-    _codigoCtrl.dispose();
     _pesoCtrl.dispose();
     _stockMinCtrl.dispose();
     super.dispose();
@@ -852,13 +1045,12 @@ class _FormularioProductoState extends State<_FormularioProducto> {
       'nombre':        _nombreCtrl.text.trim(),
       'descripcion':   _descCtrl.text.trim().isEmpty
           ? null : _descCtrl.text.trim(),
-      'codigo_barras': _codigoCtrl.text.trim().isEmpty
-          ? null : _codigoCtrl.text.trim(),
       'categoria_id':  _categoriaId,
       'marca_id':      _marcaId,
       'tipo_peso':     _tipoPeso,
       'unidad':        _unidad,
       'activo':        _activo,
+      'proveedor_ids': _proveedorIds.toList(),
     };
 
     if (_tipoPeso == 'fijo' && _pesoCtrl.text.isNotEmpty) {
@@ -939,6 +1131,7 @@ class _FormularioProductoState extends State<_FormularioProducto> {
               const Spacer(),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close, color: Colors.white)),
             ]),
           ),
@@ -1064,38 +1257,47 @@ class _FormularioProductoState extends State<_FormularioProducto> {
                   ),
                   const SizedBox(height: 14),
 
-                  // ── Código barras ────────────────────────────
-                  TextFormField(
-                    controller: _codigoCtrl,
-                    maxLength: 100,
-                    onChanged: (_) => setState(() {}),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                          RegExp(r'[a-zA-Z0-9\-]')),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: 'Código de barras (opcional)',
-                      hintText: 'Ej: 7890001234567',
-                      prefixIcon: const Icon(
-                          Icons.qr_code_rounded,
-                          color: ColoresCarolina.celeste),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                              color: ColoresCarolina.celeste,
-                              width: 2)),
-                      counterText: _codigoCtrl.text.isNotEmpty
-                          ? '${_codigoCtrl.text.length}/100' : '',
-                    ),
-                    validator: (v) {
-                      if ((v ?? '').trim().length > 100) {
-                        return 'Máximo 100 caracteres';
-                      }
-                      return null;
-                    },
+                  // ── Proveedores ────────────────────────────
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Proveedores (opcional)',
+                        style: TextStyle(fontSize: 12.5,
+                            color: Colors.grey.shade700)),
                   ),
+                  const SizedBox(height: 6),
+                  if (widget.proveedores.isEmpty)
+                    Text('No hay proveedores registrados todavía.',
+                        style: TextStyle(fontSize: 12.5,
+                            color: Colors.grey.shade600))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.proveedores.map((pv) {
+                        final id = pv['id'] as int;
+                        final seleccionado = _proveedorIds.contains(id);
+                        return FilterChip(
+                          label: Text(pv['nombre_completo'] ?? pv['nombre'] ?? ''),
+                          selected: seleccionado,
+                          selectedColor: ColoresCarolina.celeste.withValues(alpha: 0.15),
+                          checkmarkColor: ColoresCarolina.celeste,
+                          labelStyle: TextStyle(
+                              fontSize: 12.5,
+                              color: seleccionado
+                                  ? ColoresCarolina.celesteOscuro
+                                  : Colors.grey.shade800,
+                              fontWeight: seleccionado
+                                  ? FontWeight.w600 : FontWeight.normal),
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _proveedorIds.add(id);
+                            } else {
+                              _proveedorIds.remove(id);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
                   const SizedBox(height: 14),
 
                   // ── Categoría ────────────────────────────────

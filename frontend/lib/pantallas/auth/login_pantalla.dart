@@ -1,8 +1,10 @@
 // carolina/frontend/lib/pantallas/auth/login_pantalla.dart
 import 'package:flutter/material.dart';
+import '../../constantes/breakpoints.dart';
 import '../../constantes/colores.dart';
 import '../../constantes/rutas.dart';
 import '../../servicios/auth_servicio.dart';
+import '../../widgets/logo_carolina.dart';
 import '../../widgets/notificacion.dart';
 
 class LoginPantalla extends StatefulWidget {
@@ -49,8 +51,7 @@ class _LoginPantallaState extends State<LoginPantalla> {
 
   @override
   Widget build(BuildContext context) {
-    final ancho = MediaQuery.of(context).size.width;
-    final esMovil = ancho < 700;
+    final esMovil = Breakpoints.esMovil(context);
 
     return Scaffold(
       body: Row(
@@ -61,24 +62,12 @@ class _LoginPantallaState extends State<LoginPantalla> {
               flex: 5,
               child: Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [ColoresCarolina.celesteOscuro, ColoresCarolina.celeste],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: ColoresCarolina.gradienteMarca,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.storefront_rounded,
-                          color: Colors.white, size: 80),
-                    ),
+                    const LogoCarolina(tamano: 110),
                     const SizedBox(height: 32),
                     const Text('Distribuidora de\nQuesos Carolina',
                         textAlign: TextAlign.center,
@@ -120,16 +109,8 @@ class _LoginPantallaState extends State<LoginPantalla> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (esMovil) ...[
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: ColoresCarolina.celeste,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.storefront_rounded,
-                                  color: Colors.white, size: 40),
-                            ),
+                          const Center(
+                            child: LogoCarolina(tamano: 72, sobreFondoOscuro: false),
                           ),
                           const SizedBox(height: 20),
                         ],

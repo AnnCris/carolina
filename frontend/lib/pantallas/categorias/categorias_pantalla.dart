@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 
@@ -160,6 +161,9 @@ class _CategoriasPantallaState extends State<CategoriasPantalla> {
               const Text('Gestión de Categorías',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
                       color: ColoresCarolina.celesteOscuro)),
+              const SizedBox(height: 4),
+              const Text('Organiza tus productos por categoría',
+                  style: TextStyle(fontSize: 13, color: ColoresCarolina.grisMedio)),
               const SizedBox(height: 6),
               _chip('${_categorias.length} categorías', ColoresCarolina.celeste),
             ])),
@@ -188,6 +192,7 @@ class _CategoriasPantallaState extends State<CategoriasPantalla> {
                 prefixIcon: const Icon(Icons.search_rounded, color: ColoresCarolina.celeste),
                 suffixIcon: _busqueda.isNotEmpty
                     ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18),
+                        tooltip: 'Limpiar búsqueda',
                         onPressed: () => setState(() => _busqueda = ''))
                     : null,
                 filled: true, fillColor: const Color(0xFFF1F5F9),
@@ -226,6 +231,18 @@ class _CategoriasPantallaState extends State<CategoriasPantalla> {
             : 'No hay categorías registradas',
             style: const TextStyle(color: ColoresCarolina.grisMedio, fontSize: 15)),
       ]));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtradas.length,
+        itemBuilder: (_, i) => _TarjetaCategoriaMovil(
+          categoria: filtradas[i],
+          onEditar: () => _abrirFormulario(categoria: filtradas[i]),
+          onEliminar: () => _eliminar(filtradas[i]),
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -356,6 +373,88 @@ class _FilaCategoria extends StatelessWidget {
   );
 }
 
+// ─── Tarjeta para pantallas angostas (celular) ─────────────────────────────────
+class _TarjetaCategoriaMovil extends StatelessWidget {
+  final Map<String, dynamic> categoria;
+  final VoidCallback onEditar, onEliminar;
+
+  const _TarjetaCategoriaMovil({
+    required this.categoria,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: ColoresCarolina.celeste.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.category_rounded,
+                  color: ColoresCarolina.celeste, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(categoria['nombre'] ?? '',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 15),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Text(
+            categoria['descripcion'] ?? '—',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text('${categoria['total_productos'] ?? 0} productos',
+                  style: const TextStyle(fontSize: 11, color: Colors.green,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            _btn(Icons.edit_rounded, Colors.orange, 'Editar categoría', onEditar),
+            const SizedBox(width: 8),
+            _btn(Icons.delete_rounded, ColoresCarolina.rojo, 'Eliminar categoría',
+                onEliminar),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) => Tooltip(
+    message: tip,
+    child: InkWell(onTap: fn, borderRadius: BorderRadius.circular(8),
+      child: Container(padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: c.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8)),
+          child: Icon(i, size: 18, color: c)),
+    ),
+  );
+}
+
 class _FormularioCategoria extends StatefulWidget {
   final Map<String, dynamic>? categoria;
   final CategoriasServicio servicio;
@@ -464,6 +563,7 @@ class _FormularioCategoriaState extends State<_FormularioCategoria> {
                 const Spacer(),
                 IconButton(
                     onPressed: () => Navigator.pop(context),
+                    tooltip: 'Cerrar',
                     icon: const Icon(Icons.close, color: Colors.white)),
               ]),
             ),

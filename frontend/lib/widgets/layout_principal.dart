@@ -1,8 +1,10 @@
 // carolina/frontend/lib/widgets/layout_principal.dart
 import 'package:flutter/material.dart';
+import '../constantes/breakpoints.dart';
 import '../constantes/colores.dart';
 import '../constantes/rutas.dart';
 import '../servicios/auth_servicio.dart';
+import 'logo_carolina.dart';
 
 class LayoutPrincipal extends StatefulWidget {
   final Widget hijo;
@@ -96,8 +98,7 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
 
   @override
   Widget build(BuildContext context) {
-    final esMovil = MediaQuery.of(context).size.width < 800;
-    if (esMovil) return _buildMovil();
+    if (Breakpoints.esMovil(context)) return _buildMovil();
     return _buildEscritorio();
   }
 
@@ -115,11 +116,15 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
   Widget _buildMovil() {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.titulo),
+        title: Text(widget.titulo,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: ColoresCarolina.celeste,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       drawer: Drawer(
+        width: 260,
+        backgroundColor: ColoresCarolina.celesteOscuro,
         child: _buildContenidoSidebar(forzarExpandido: true),
       ),
       body: widget.hijo,
@@ -147,21 +152,9 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
         Container(
           padding: EdgeInsets.symmetric(
               horizontal: expandido ? 16 : 10, vertical: 18),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [ColoresCarolina.celeste, ColoresCarolina.celesteOscuro],
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-            ),
-          ),
+          decoration: const BoxDecoration(gradient: ColoresCarolina.gradienteMarca),
           child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.storefront_rounded,
-                  color: Colors.white, size: 22),
-            ),
+            const LogoCarolina(tamano: 36),
             if (expandido) ...[
               const SizedBox(width: 10),
               const Expanded(
@@ -256,62 +249,74 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
               return Tooltip(
                 message: expandido ? '' : item['titulo'] as String,
                 preferBelow: false,
-                child: InkWell(
-                  onTap: () {
-                    if (ruta != rutaActual) {
-                      Navigator.pushReplacementNamed(context, ruta);
-                    }
-                  },
-                  child: AnimatedContainer(
+                child: Row(children: [
+                  AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    padding: EdgeInsets.symmetric(
-                        horizontal: expandido ? 14 : 10,
-                        vertical: 11),
+                    width: 3,
+                    height: 30,
+                    margin: const EdgeInsets.only(left: 8, right: 5),
                     decoration: BoxDecoration(
                       color: seleccionado
-                          ? Colors.white.withValues(alpha: 0.18)
+                          ? Colors.white
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      border: seleccionado
-                          ? Border.all(
-                              color: Colors.white.withValues(alpha: 0.25),
-                              width: 1)
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: expandido
-                          ? MainAxisAlignment.start
-                          : MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          item['icono'] as IconData,
-                          color: seleccionado
-                              ? Colors.white
-                              : Colors.white60,
-                          size: 20,
-                        ),
-                        if (expandido) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              item['titulo'] as String,
-                              style: TextStyle(
-                                  color: seleccionado
-                                      ? Colors.white
-                                      : Colors.white70,
-                                  fontWeight: seleccionado
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        if (ruta != rutaActual) {
+                          Navigator.pushReplacementNamed(context, ruta);
+                        }
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 3, vertical: 2),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: expandido ? 14 : 10,
+                            vertical: 11),
+                        decoration: BoxDecoration(
+                          color: seleccionado
+                              ? Colors.white.withValues(alpha: 0.16)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: expandido
+                              ? MainAxisAlignment.start
+                              : MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              item['icono'] as IconData,
+                              color: seleccionado
+                                  ? Colors.white
+                                  : Colors.white60,
+                              size: 20,
+                            ),
+                            if (expandido) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  item['titulo'] as String,
+                                  style: TextStyle(
+                                      color: seleccionado
+                                          ? Colors.white
+                                          : Colors.white70,
+                                      fontWeight: seleccionado
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ]),
               );
             }).toList(),
           ),
@@ -352,10 +357,9 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
       Container(
         padding: const EdgeInsets.symmetric(
             horizontal: 24, vertical: 14),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(
-              bottom: BorderSide(color: Color(0xFFE2E8F0))),
+          boxShadow: ColoresCarolina.sombraTarjeta(),
         ),
         child: Row(children: [
           Text(widget.titulo,
@@ -365,15 +369,33 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
                   color: ColoresCarolina.celesteOscuro)),
           const Spacer(),
           if (_usuario != null)
-            Row(children: [
-              const Icon(Icons.person_outline,
-                  size: 16, color: ColoresCarolina.grisMedio),
-              const SizedBox(width: 6),
-              Text('Hola, ${_usuario!['nombre']}',
-                  style: const TextStyle(
-                      color: ColoresCarolina.grisMedio,
-                      fontSize: 14)),
-            ]),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: ColoresCarolina.celesteSuave,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                CircleAvatar(
+                  radius: 12,
+                  backgroundColor: ColoresCarolina.celeste,
+                  child: Text(
+                    (_usuario!['nombre'] as String? ?? 'U')[0].toUpperCase(),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(_usuario!['nombre'] ?? '',
+                    style: const TextStyle(
+                        color: ColoresCarolina.celesteOscuro,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13)),
+              ]),
+            ),
         ]),
       ),
       // Contenido del módulo

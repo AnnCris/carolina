@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 
@@ -168,6 +169,9 @@ class _MarcasPantallaState extends State<MarcasPantalla> {
               const Text('Gestión de Marcas',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
                       color: ColoresCarolina.celesteOscuro)),
+              const SizedBox(height: 4),
+              const Text('Administra las marcas de tus productos',
+                  style: TextStyle(fontSize: 13, color: ColoresCarolina.grisMedio)),
               const SizedBox(height: 6),
               _chip('${_marcas.length} marcas', ColoresCarolina.celeste),
             ])),
@@ -196,6 +200,7 @@ class _MarcasPantallaState extends State<MarcasPantalla> {
                 prefixIcon: const Icon(Icons.search_rounded, color: ColoresCarolina.celeste),
                 suffixIcon: _busqueda.isNotEmpty
                     ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18),
+                        tooltip: 'Limpiar búsqueda',
                         onPressed: () => setState(() => _busqueda = ''))
                     : null,
                 filled: true, fillColor: const Color(0xFFF1F5F9),
@@ -234,6 +239,19 @@ class _MarcasPantallaState extends State<MarcasPantalla> {
             : 'No hay marcas registradas',
             style: const TextStyle(color: ColoresCarolina.grisMedio, fontSize: 15)),
       ]));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtradas.length,
+        itemBuilder: (_, i) => _TarjetaMarcaMovil(
+          marca: filtradas[i],
+          color: _colorMarca(i),
+          onEditar: () => _abrirFormulario(marca: filtradas[i]),
+          onEliminar: () => _eliminar(filtradas[i]),
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -352,6 +370,77 @@ class _FilaMarca extends StatelessWidget {
   );
 }
 
+// ─── Tarjeta para pantallas angostas (celular) ─────────────────────────────────
+class _TarjetaMarcaMovil extends StatelessWidget {
+  final Map<String, dynamic> marca;
+  final Color color;
+  final VoidCallback onEditar, onEliminar;
+
+  const _TarjetaMarcaMovil({
+    required this.marca,
+    required this.color,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inicial = (marca['nombre'] as String? ?? 'M')[0].toUpperCase();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: color.withValues(alpha: 0.15),
+              child: Text(inicial, style: TextStyle(color: color,
+                  fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(marca['nombre'] ?? '',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 15),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Text(
+            marca['descripcion'] ?? '—',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            _btn(Icons.edit_rounded, Colors.orange, 'Editar marca', onEditar),
+            const SizedBox(width: 8),
+            _btn(Icons.delete_rounded, ColoresCarolina.rojo, 'Eliminar marca',
+                onEliminar),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) => Tooltip(
+    message: tip,
+    child: InkWell(onTap: fn, borderRadius: BorderRadius.circular(8),
+      child: Container(padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: c.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8)),
+          child: Icon(i, size: 18, color: c)),
+    ),
+  );
+}
+
 class _FormularioMarca extends StatefulWidget {
   final Map<String, dynamic>? marca;
   final MarcasServicio servicio;
@@ -464,6 +553,7 @@ class _FormularioMarcaState extends State<_FormularioMarca> {
                 const Spacer(),
                 IconButton(
                     onPressed: () => Navigator.pop(context),
+                    tooltip: 'Cerrar',
                     icon: const Icon(Icons.close,
                         color: Colors.white)),
               ]),

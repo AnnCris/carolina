@@ -13,7 +13,6 @@ class Producto(db.Model):
     tipo_peso = db.Column(db.String(20), default='fijo')  # fijo | variable
     peso_gramos = db.Column(db.Numeric(10, 3))
     unidad = db.Column(db.String(20), default='unidad')
-    codigo_barras = db.Column(db.String(100))
     activo = db.Column(db.Boolean, default=True)
 
     categoria = db.relationship('Categoria', backref='productos')
@@ -34,7 +33,10 @@ class Producto(db.Model):
             'tipo_peso': self.tipo_peso,
             'peso_gramos': float(self.peso_gramos) if self.peso_gramos else None,
             'unidad': self.unidad,
-            'codigo_barras': self.codigo_barras,
             'activo': self.activo,
-            'stock': float(self.inventario.stock_actual) if self.inventario else 0
+            'stock': float(self.inventario.stock_actual) if self.inventario else 0,
+            'proveedores': [
+                {'id': pr.id, 'nombre': pr.nombre_completo} for pr in self.proveedores
+            ],
+            'proveedor_ids': [pr.id for pr in self.proveedores],
         }

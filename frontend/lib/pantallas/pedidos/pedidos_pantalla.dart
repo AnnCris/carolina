@@ -6,10 +6,12 @@ import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../constantes/breakpoints.dart';
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
+import '../devoluciones/devoluciones_pantalla.dart' show kMotivosDevolucion;
 
 // ─── Servicio ─────────────────────────────────────────────────────────────────
 class PedidosServicio {
@@ -43,6 +45,14 @@ class PedidosServicio {
         Uri.parse(ApiConfig.productos), headers: await _h);
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Error al cargar productos');
+  }
+
+  Future<List<dynamic>> listarDevolucionesPendientes(int clienteId) async {
+    final res = await http.get(
+        Uri.parse('${ApiConfig.devoluciones}/pendientes/$clienteId'),
+        headers: await _h);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    return [];
   }
 
   Future<Map<String, dynamic>> crear(Map<String, dynamic> datos) async {
@@ -186,10 +196,18 @@ class _PedidosPantallaState extends State<PedidosPantalla> {
       context: context, barrierDismissible: false,
       builder: (_) => _FormularioPedido(
         pedido: pedido, servicio: _servicio,
-        onGuardado: () {
+        onGuardado: (resultado) {
           Navigator.pop(context);
           Notificacion.exito(context,
               pedido == null ? 'Pedido creado' : 'Pedido actualizado');
+          if (pedido != null && resultado['venta_generada'] == true) {
+            final recibo = resultado['venta_numero_recibo'];
+            Notificacion.advertencia(context,
+                'Este pedido ya tenía la venta'
+                '${recibo != null ? " #$recibo" : ""} generada — se '
+                'actualizaron los productos y el inventario de esa venta '
+                'automáticamente.');
+          }
           _cargar();
         },
       ),
@@ -309,23 +327,26 @@ class _PedidosPantallaState extends State<PedidosPantalla> {
     );
   }
 
-  Widget _buildHeader() => Container(
-    padding: const EdgeInsets.fromLTRB(28, 22, 28, 18),
-    decoration: const BoxDecoration(color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
-    child: Row(children: [
-      Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Gestión de Pedidos',
-              style: TextStyle(fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: ColoresCarolina.celesteOscuro)),
-          const SizedBox(height: 6),
-          _chip('${_pedidos.length} pedidos registrados',
-              ColoresCarolina.celeste),
-        ],
-      )),
+  Widget _buildHeader() {
+    final esMovil = Breakpoints.esMovil(context);
+    final titulo = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Gestión de Pedidos',
+            style: TextStyle(fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: ColoresCarolina.celesteOscuro)),
+        const SizedBox(height: 4),
+        const Text(
+            'Registra, edita e imprime los pedidos de tus clientes.',
+            style: TextStyle(fontSize: 12.5,
+                color: ColoresCarolina.grisMedio)),
+        const SizedBox(height: 8),
+        _chip('${_pedidos.length} pedidos registrados',
+            ColoresCarolina.celeste),
+      ],
+    );
+    final botones = [
       ElevatedButton.icon(
         onPressed: _imprimirListaDiaria,
         icon: const Icon(Icons.print_rounded, size: 18),
@@ -339,7 +360,6 @@ class _PedidosPantallaState extends State<PedidosPantalla> {
               borderRadius: BorderRadius.circular(10)),
         ),
       ),
-      const SizedBox(width: 10),
       ElevatedButton.icon(
         onPressed: () => _abrirFormulario(),
         icon: const Icon(Icons.add_rounded, size: 18),
@@ -353,8 +373,30 @@ class _PedidosPantallaState extends State<PedidosPantalla> {
               borderRadius: BorderRadius.circular(10)),
         ),
       ),
-    ]),
-  );
+    ];
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          esMovil ? 16 : 28, 22, esMovil ? 16 : 28, 18),
+      decoration: const BoxDecoration(color: Colors.white,
+          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+      child: esMovil
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                titulo,
+                const SizedBox(height: 14),
+                Wrap(spacing: 10, runSpacing: 10, children: botones),
+              ],
+            )
+          : Row(children: [
+              Expanded(child: titulo),
+              botones[0],
+              const SizedBox(width: 10),
+              botones[1],
+            ]),
+    );
+  }
 
   Widget _buildBarra() => Container(
     padding: const EdgeInsets.symmetric(
@@ -370,6 +412,7 @@ class _PedidosPantallaState extends State<PedidosPantalla> {
           suffixIcon: _busqueda.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'Limpiar búsqueda',
                   onPressed: () => setState(() => _busqueda = ''))
               : null,
           filled: true, fillColor: const Color(0xFFF1F5F9),
@@ -418,6 +461,22 @@ class _PedidosPantallaState extends State<PedidosPantalla> {
                   fontSize: 15)),
         ],
       ));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final p = filtrados[i];
+          return _TarjetaPedidoMovil(
+            pedido:     p,
+            onVer:      () => _verDetalle(p),
+            onEditar:   () => _abrirFormulario(pedido: p),
+            onEliminar: () => _eliminar(p),
+          );
+        },
+      );
     }
 
     return SingleChildScrollView(
@@ -568,6 +627,114 @@ class _FilaPedido extends StatelessWidget {
               child: Icon(i, size: 16, color: c))));
 }
 
+// ─── Tarjeta móvil ────────────────────────────────────────────────────────────
+class _TarjetaPedidoMovil extends StatelessWidget {
+  final Map<String, dynamic> pedido;
+  final VoidCallback onVer, onEditar, onEliminar;
+
+  const _TarjetaPedidoMovil({
+    required this.pedido,
+    required this.onVer,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final detalles = pedido['detalles'] as List? ?? [];
+    final resumen  = detalles.take(3).map((d) {
+      final cant = (d['cantidad'] as num).toDouble();
+      final cantStr = cant % 1 == 0
+          ? cant.toStringAsFixed(0) : cant.toStringAsFixed(1);
+      return '$cantStr ${d['producto']}';
+    }).join(', ');
+    final extra =
+        detalles.length > 3 ? ' +${detalles.length - 3} más' : '';
+    final entrega    = pedido['fecha_entrega'];
+    final entregaStr = entrega != null
+        ? entrega.toString().substring(0, 10) : '—';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                  color: ColoresCarolina.celeste.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('#${pedido['id']}',
+                  style: const TextStyle(fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: ColoresCarolina.celeste)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(
+                pedido['cliente'] ?? '-',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 15),
+                overflow: TextOverflow.ellipsis)),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 14, runSpacing: 6, children: [
+            _dato(Icons.shopping_bag_outlined,
+                resumen.isNotEmpty ? '$resumen$extra' : '(sin productos)'),
+            _dato(Icons.local_shipping_outlined, 'Entrega: $entregaStr'),
+          ]),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _btn(Icons.visibility_rounded,
+                  ColoresCarolina.celeste, 'Ver detalle', onVer),
+              const SizedBox(width: 4),
+              _btn(Icons.edit_rounded,
+                  Colors.orange, 'Editar', onEditar),
+              const SizedBox(width: 4),
+              _btn(Icons.delete_rounded,
+                  ColoresCarolina.rojo, 'Eliminar', onEliminar),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dato(IconData i, String t) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(i, size: 14, color: ColoresCarolina.grisMedio),
+      const SizedBox(width: 5),
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 220),
+        child: Text(t,
+            style: const TextStyle(
+                fontSize: 12.5, color: Color(0xFF475569)),
+            overflow: TextOverflow.ellipsis),
+      ),
+    ],
+  );
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) =>
+      Tooltip(message: tip,
+        child: InkWell(onTap: fn, borderRadius: BorderRadius.circular(8),
+          child: Container(padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                  color: c.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Icon(i, size: 16, color: c))));
+}
+
 // ─── Detalle ──────────────────────────────────────────────────────────────────
 class _DetallePedido extends StatelessWidget {
   final Map<String, dynamic> pedido;
@@ -606,6 +773,7 @@ class _DetallePedido extends StatelessWidget {
                       fontWeight: FontWeight.bold))),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close,
                       color: Colors.white)),
             ]),
@@ -758,7 +926,7 @@ class _DetallePedido extends StatelessWidget {
 class _FormularioPedido extends StatefulWidget {
   final Map<String, dynamic>? pedido;
   final PedidosServicio        servicio;
-  final VoidCallback           onGuardado;
+  final void Function(Map<String, dynamic> resultado) onGuardado;
   const _FormularioPedido({
     this.pedido,
     required this.servicio,
@@ -774,9 +942,9 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
 
   List<dynamic> _clientes      = [];
   List<dynamic> _productos     = [];
+  List<dynamic> _devolucionesPendientes = [];
   int?          _clienteId;
-  DateTime      _fechaEntrega  =
-      DateTime.now().add(const Duration(days: 1));
+  DateTime      _fechaEntrega  = DateTime.now();
   bool          _cargando      = false;
   bool          _cargandoDatos = true;
 
@@ -829,12 +997,24 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
         }
         setState(() {});
       }
+      if (_clienteId != null) {
+        await _cargarDevolucionesPendientes(_clienteId!);
+      }
     } catch (e) {
       if (mounted) {
         Notificacion.error(context,
             e.toString().replaceAll('Exception: ', ''));
         setState(() => _cargandoDatos = false);
       }
+    }
+  }
+
+  Future<void> _cargarDevolucionesPendientes(int clienteId) async {
+    try {
+      final lista = await widget.servicio.listarDevolucionesPendientes(clienteId);
+      if (mounted) setState(() => _devolucionesPendientes = lista);
+    } catch (_) {
+      // Aviso informativo: si falla, simplemente no se muestra el banner.
     }
   }
 
@@ -907,13 +1087,11 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
     };
 
     try {
-      if (_esEdicion) {
-        await widget.servicio
-            .actualizar(widget.pedido!['id'], datos);
-      } else {
-        await widget.servicio.crear(datos);
-      }
-      widget.onGuardado();
+      final resultado = _esEdicion
+          ? await widget.servicio
+              .actualizar(widget.pedido!['id'], datos)
+          : await widget.servicio.crear(datos);
+      widget.onGuardado(resultado);
     } catch (e) {
       if (mounted) {
         Notificacion.error(context,
@@ -967,6 +1145,7 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
               const Spacer(),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close,
                       color: Colors.white)),
             ]),
@@ -999,12 +1178,21 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
                                           overflow: TextOverflow
                                               .ellipsis)))
                               .toList(),
-                          onChanged: (v) =>
-                              setState(() => _clienteId = v),
+                          onChanged: (v) {
+                            setState(() {
+                              _clienteId = v;
+                              _devolucionesPendientes = [];
+                            });
+                            if (v != null) _cargarDevolucionesPendientes(v);
+                          },
                           validator: (v) => v == null
                               ? 'Selecciona un cliente'
                               : null,
                         ),
+                        if (_devolucionesPendientes.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _buildAvisoDevoluciones(),
+                        ],
                         const SizedBox(height: 14),
 
                         // Fecha entrega
@@ -1186,6 +1374,48 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
         borderSide: const BorderSide(
             color: ColoresCarolina.celeste, width: 2)),
   );
+
+  Widget _buildAvisoDevoluciones() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+          SizedBox(width: 8),
+          Expanded(child: Text('Este cliente tiene devolución(es) pendiente(s)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.orange))),
+        ]),
+        const SizedBox(height: 6),
+        ..._devolucionesPendientes.map((d) {
+          final detalles = (d['detalles'] as List?) ?? [];
+          final resumen = detalles.map((det) {
+            final cant = (det['cantidad'] as num?)?.toDouble() ?? 0;
+            final cantStr = cant % 1 == 0 ? cant.toStringAsFixed(0) : cant.toStringAsFixed(2);
+            final motivo = kMotivosDevolucion[det['motivo']] ?? det['motivo'] ?? '';
+            return '$cantStr ${det['producto']} ($motivo)';
+          }).join(', ');
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text('• $resumen',
+                style: const TextStyle(fontSize: 12.5, color: Color(0xFF7C4A03))),
+          );
+        }),
+        const Padding(
+          padding: EdgeInsets.only(top: 2),
+          child: Text(
+              'Recuerda llevar el producto de cambio y registrarlo como resuelto '
+              'cuando factures la venta.',
+              style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic)),
+        ),
+      ]),
+    );
+  }
 }
 
 // ─── Item de pedido ───────────────────────────────────────────────────────────
@@ -1301,6 +1531,7 @@ class _ItemPedidoState extends State<_ItemPedido> {
         IconButton(
           onPressed: widget.onEliminar,
           icon: const Icon(Icons.delete_rounded, size: 18),
+          tooltip: 'Quitar producto',
           color: ColoresCarolina.rojo,
           padding: const EdgeInsets.all(6),
           style: IconButton.styleFrom(

@@ -1,12 +1,12 @@
 from extensions import db
-from datetime import datetime
- 
+from utilidades.tiempo import ahora_bolivia
+
 class Pedido(db.Model):
     __tablename__ = 'pedidos'
     id             = db.Column(db.Integer, primary_key=True)
     cliente_id     = db.Column(db.Integer, db.ForeignKey('clientes.id'))
     usuario_id     = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
-    fecha          = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha          = db.Column(db.DateTime, default=ahora_bolivia)
     fecha_entrega  = db.Column(db.Date)
     estado         = db.Column(db.String(30), default='pendiente')
     total_estimado = db.Column(db.Numeric(12, 2), default=0)
@@ -27,6 +27,8 @@ class Pedido(db.Model):
         return ' '.join(partes)
  
     def to_dict(self):
+        venta_activa = next(
+            (v for v in self.ventas if v.estado != 'anulada'), None)
         return {
             'id':             self.id,
             'cliente_id':     self.cliente_id,
@@ -38,6 +40,9 @@ class Pedido(db.Model):
             'estado':         self.estado,
             'nota':           self.nota,
             'detalles':       [d.to_dict() for d in self.detalles],
+            'venta_generada':      venta_activa is not None,
+            'venta_numero_recibo': venta_activa.numero_recibo
+                                    if venta_activa else None,
         }
  
  

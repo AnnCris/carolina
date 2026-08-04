@@ -15,6 +15,7 @@ import '../pantallas/proveedores/proveedores_pantalla.dart';
 import '../pantallas/compras/compras_pantalla.dart';
 import '../pantallas/pedidos/pedidos_pantalla.dart';
 import '../pantallas/precios/precios_pantalla.dart';
+import '../pantallas/devoluciones/devoluciones_pantalla.dart';
 
 class RutasApp {
   static const String login        = '/';
@@ -37,7 +38,8 @@ class RutasApp {
     login:    (_) => const LoginPantalla(),
     registro: (_) => const RegistroPantalla(),
 
-    dashboard: (_) => const DashboardPantalla(),
+    dashboard: (_) => const LayoutPrincipal(
+        titulo: 'Dashboard', hijo: DashboardPantalla()),
 
     ventas: (_) => const LayoutPrincipal(
         titulo: 'Ventas', hijo: VentasPantalla()),
@@ -53,8 +55,8 @@ class RutasApp {
       titulo: 'Proveedores', hijo: ProveedoresPantalla()),  
     pedidos: (_) => const LayoutPrincipal(
       titulo: 'Pedidos', hijo: PedidosPantalla()),
-    devoluciones: (_) => LayoutPrincipal(
-        titulo: 'Devoluciones', hijo: _placeholder('Devoluciones')),
+    devoluciones: (_) => const LayoutPrincipal(
+        titulo: 'Devoluciones', hijo: DevolucionesPantalla()),
     usuarios: (_) => const LayoutPrincipal(
         titulo: 'Usuarios', hijo: UsuariosPantalla()),
     categorias: (_) => const LayoutPrincipal(
@@ -64,21 +66,4 @@ class RutasApp {
     precios: (_) => const LayoutPrincipal(
         titulo: 'Precios', hijo: PreciosPantalla()),
   };
-
-  static Widget _placeholder(String nombre) => Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.construction_rounded, size: 64,
-            color: Colors.grey.shade300),
-        const SizedBox(height: 16),
-        Text('Módulo $nombre',
-            style: const TextStyle(fontSize: 20,
-                fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 8),
-        const Text('En desarrollo...',
-            style: TextStyle(color: Colors.grey)),
-      ],
-    ),
-  );
 }

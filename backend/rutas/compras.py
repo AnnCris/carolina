@@ -4,6 +4,7 @@ from extensions import db
 from modelos.compra import Compra, DetalleCompra
 from modelos.inventario import Inventario, MovimientoInventario
 from utilidades.permisos import requiere_permiso, obtener_usuario_actual
+from utilidades.precios_compra import registrar_precio_compra
 from datetime import datetime
 import uuid, os
 
@@ -153,6 +154,11 @@ def crear():
         db.session.add(detalle)
         total += d['subtotal']
 
+        # El precio de compra se registra siempre (sin importar el
+        # estado): es lo que se acordó pagar a este proveedor.
+        registrar_precio_compra(
+            item['producto_id'], compra.proveedor_id, d['precio_unitario'])
+
         # Solo suma stock si la compra fue RECIBIDA
         if estado == 'recibida':
             inv = Inventario.query.filter_by(
@@ -268,6 +274,9 @@ def actualizar(id):
             )
             db.session.add(detalle)
             total += d['subtotal']
+
+            registrar_precio_compra(
+                item['producto_id'], c.proveedor_id, d['precio_unitario'])
 
             # Solo suma stock si está recibida
             if nuevo_estado == 'recibida':

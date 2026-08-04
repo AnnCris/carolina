@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../constantes/breakpoints.dart';
 import '../../constantes/colores.dart';
 import '../../constantes/rutas.dart';
 import '../../servicios/auth_servicio.dart';
@@ -82,57 +83,80 @@ class _RegistroPantallaState extends State<RegistroPantalla> {
 
   @override
   Widget build(BuildContext context) {
+    final movil = Breakpoints.esMovil(context);
     return Scaffold(
       backgroundColor: ColoresCarolina.fondo,
       appBar: AppBar(
         title: const Text('Crear cuenta'),
-        backgroundColor: ColoresCarolina.celeste,
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(gradient: ColoresCarolina.gradienteMarca),
+        ),
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(movil ? 16 : 24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: ColoresCarolina.borde),
+                boxShadow: ColoresCarolina.sombraTarjeta(),
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: EdgeInsets.all(movil ? 22 : 32),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text('Completa tus datos',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: ColoresCarolina.celesteOscuro)),
+                      const SizedBox(height: 4),
+                      const Text(
+                          'Solo toma un minuto crear tu cuenta',
+                          style: TextStyle(
+                              color: ColoresCarolina.grisMedio, fontSize: 13)),
+                      const SizedBox(height: 20),
                       Center(
                         child: Column(
                           children: [
-                            GestureDetector(
-                              onTap: _seleccionarFoto,
-                              child: Stack(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 50,
-                                    backgroundColor: ColoresCarolina.grisClaro,
-                                    backgroundImage: _foto != null
-                                        ? FileImage(File(_foto!.path)) : null,
-                                    child: _foto == null
-                                        ? const Icon(Icons.person, size: 50,
-                                            color: ColoresCarolina.celeste) : null,
-                                  ),
-                                  Positioned(
-                                    bottom: 0, right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: ColoresCarolina.celeste,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.camera_alt,
-                                          color: Colors.white, size: 16),
+                            Tooltip(
+                              message: 'Toca para elegir una foto de perfil',
+                              child: GestureDetector(
+                                onTap: _seleccionarFoto,
+                                child: Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 50,
+                                      backgroundColor: ColoresCarolina.celesteSuave,
+                                      backgroundImage: _foto != null
+                                          ? FileImage(File(_foto!.path)) : null,
+                                      child: _foto == null
+                                          ? const Icon(Icons.person, size: 50,
+                                              color: ColoresCarolina.celeste) : null,
                                     ),
-                                  ),
-                                ],
+                                    Positioned(
+                                      bottom: 0, right: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: ColoresCarolina.celeste,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                        ),
+                                        child: const Icon(Icons.camera_alt,
+                                            color: Colors.white, size: 16),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 8),

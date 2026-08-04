@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify, current_app
 from extensions import db
 from modelos.producto import Producto
 from modelos.inventario import Inventario
+from modelos.proveedor import Proveedor
 from utilidades.permisos import requiere_permiso
 import uuid, os
 
@@ -39,9 +40,12 @@ def crear():
         tipo_peso    = datos.get('tipo_peso', 'fijo'),
         peso_gramos  = datos.get('peso_gramos'),
         unidad       = datos.get('unidad', 'unidad'),
-        codigo_barras= (datos.get('codigo_barras') or '').strip() or None,
         activo       = True,
     )
+    proveedor_ids = datos.get('proveedor_ids')
+    if proveedor_ids:
+        producto.proveedores = Proveedor.query.filter(
+            Proveedor.id.in_(proveedor_ids)).all()
     db.session.add(producto)
     db.session.flush()
 
@@ -74,8 +78,10 @@ def actualizar(id):
     if 'tipo_peso'     in datos: p.tipo_peso      = datos['tipo_peso']
     if 'peso_gramos'   in datos: p.peso_gramos    = datos['peso_gramos']
     if 'unidad'        in datos: p.unidad         = datos['unidad']
-    if 'codigo_barras' in datos: p.codigo_barras  = (datos['codigo_barras'] or '').strip() or None
     if 'activo'        in datos: p.activo         = datos['activo']
+    if 'proveedor_ids' in datos:
+        ids = datos['proveedor_ids'] or []
+        p.proveedores = Proveedor.query.filter(Proveedor.id.in_(ids)).all() if ids else []
 
     db.session.commit()
     return jsonify(p.to_dict())

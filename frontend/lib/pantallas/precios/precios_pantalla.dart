@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 
@@ -143,6 +144,9 @@ class _PreciosPantallaState extends State<PreciosPantalla> {
               style: TextStyle(fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: ColoresCarolina.celesteOscuro)),
+          const SizedBox(height: 4),
+          const Text('Define precios de compra y venta, y controla tu margen de ganancia',
+              style: TextStyle(fontSize: 13, color: ColoresCarolina.grisMedio)),
           const SizedBox(height: 6),
           Row(children: [
             _chip('$_conAmbosPrecio con precios', Colors.green),
@@ -171,6 +175,7 @@ class _PreciosPantallaState extends State<PreciosPantalla> {
           suffixIcon: _busqueda.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'Limpiar búsqueda',
                   onPressed: () => setState(() => _busqueda = ''))
               : null,
           filled: true, fillColor: const Color(0xFFF1F5F9),
@@ -241,6 +246,17 @@ class _PreciosPantallaState extends State<PreciosPantalla> {
                   color: ColoresCarolina.grisMedio, fontSize: 15)),
         ],
       ));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) => _TarjetaPrecioMovil(
+          item: filtrados[i],
+          onEditar: () => _abrirFormulario(item: filtrados[i]),
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -405,6 +421,140 @@ class _FilaPrecio extends StatelessWidget {
   );
 }
 
+// ─── Tarjeta para pantallas angostas (celular) ─────────────────────────────────
+class _TarjetaPrecioMovil extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onEditar;
+
+  const _TarjetaPrecioMovil({
+    required this.item,
+    required this.onEditar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pv = item['precio_venta']  as double?;
+    final pc = item['precio_compra'] as double?;
+    final ganancia    = item['ganancia']     as double?;
+    final gananciaPct = item['ganancia_pct'] as double?;
+
+    final tieneAmbos = pv != null && pc != null;
+    final colorGanancia = ganancia != null && ganancia > 0
+        ? Colors.green : Colors.red;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: ColoresCarolina.celeste.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.price_change_rounded,
+                  color: ColoresCarolina.celeste, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(item['producto'] ?? '-',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 15),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                  color: ColoresCarolina.celeste.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(item['categoria'] ?? '-',
+                  style: const TextStyle(fontSize: 11,
+                      color: ColoresCarolina.celeste,
+                      fontWeight: FontWeight.w600)),
+            ),
+            if (pc != null)
+              _etiquetaValor('Compra', 'Bs ${pc.toStringAsFixed(2)}', Colors.orange)
+            else
+              _sinPrecio(),
+            if (pv != null)
+              _etiquetaValor('Venta', 'Bs ${pv.toStringAsFixed(2)}', Colors.green)
+            else
+              _sinPrecio(),
+          ]),
+          const SizedBox(height: 10),
+          if (tieneAmbos && ganancia != null)
+            Row(children: [
+              Icon(ganancia > 0
+                  ? Icons.trending_up_rounded
+                  : Icons.trending_down_rounded,
+                  size: 16, color: colorGanancia),
+              const SizedBox(width: 6),
+              Text('Ganancia: Bs ${ganancia.toStringAsFixed(2)}',
+                  style: TextStyle(fontWeight: FontWeight.bold,
+                      fontSize: 13, color: colorGanancia)),
+              if (gananciaPct != null) ...[
+                const SizedBox(width: 6),
+                Text('(${gananciaPct.toStringAsFixed(1)}% margen)',
+                    style: TextStyle(fontSize: 11, color: colorGanancia)),
+              ],
+            ])
+          else
+            const Text('— Sin datos de ganancia',
+                style: TextStyle(color: ColoresCarolina.grisMedio, fontSize: 12)),
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            Tooltip(
+              message: 'Editar precios',
+              child: InkWell(
+                onTap: onEditar,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: ColoresCarolina.celeste.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.edit_rounded,
+                      size: 18, color: ColoresCarolina.celeste),
+                ),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _etiquetaValor(String etiqueta, String valor, Color c) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20)),
+    child: Text('$etiqueta: $valor',
+        style: TextStyle(fontSize: 11, color: c, fontWeight: FontWeight.w600)),
+  );
+
+  Widget _sinPrecio() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20)),
+    child: const Text('Sin precio',
+        style: TextStyle(fontSize: 10, color: Colors.orange,
+            fontWeight: FontWeight.w600)),
+  );
+}
+
 // ─── Formulario ───────────────────────────────────────────────────────────────
 class _FormularioPrecio extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -422,36 +572,37 @@ class _FormularioPrecio extends StatefulWidget {
 class _FormularioPrecioState extends State<_FormularioPrecio> {
   final _formKey     = GlobalKey<FormState>();
   final _ventaCtrl   = TextEditingController();
-  final _compraCtrl  = TextEditingController();
   bool  _cargando    = false;
+
+  double? get _precioCompraRef => widget.item['precio_compra'] as double?;
+  String? get _proveedorRef =>
+      widget.item['precio_compra_proveedor'] as String?;
 
   @override
   void initState() {
     super.initState();
-    final pv = widget.item['precio_venta']  as double?;
-    final pc = widget.item['precio_compra'] as double?;
-    if (pv != null) _ventaCtrl.text  = pv.toStringAsFixed(2);
-    if (pc != null) _compraCtrl.text = pc.toStringAsFixed(2);
+    final pv = widget.item['precio_venta'] as double?;
+    if (pv != null) _ventaCtrl.text = pv.toStringAsFixed(2);
   }
 
   @override
   void dispose() {
     _ventaCtrl.dispose();
-    _compraCtrl.dispose();
     super.dispose();
   }
 
-  // Calcula ganancia en tiempo real
+  // Calcula ganancia en tiempo real contra el último precio de compra
+  // real (registrado desde Compras) — no se edita aquí.
   double? get _ganancia {
     final pv = double.tryParse(_ventaCtrl.text);
-    final pc = double.tryParse(_compraCtrl.text);
+    final pc = _precioCompraRef;
     if (pv == null || pc == null) return null;
     return pv - pc;
   }
 
   double? get _gananciaPct {
     final g  = _ganancia;
-    final pc = double.tryParse(_compraCtrl.text);
+    final pc = _precioCompraRef;
     if (g == null || pc == null || pc == 0) return null;
     return (g / pc) * 100;
   }
@@ -462,13 +613,8 @@ class _FormularioPrecioState extends State<_FormularioPrecio> {
 
     final datos = <String, dynamic>{
       'producto_id': widget.item['producto_id'],
+      'precio_venta': double.tryParse(_ventaCtrl.text),
     };
-    if (_ventaCtrl.text.trim().isNotEmpty) {
-      datos['precio_venta'] = double.tryParse(_ventaCtrl.text);
-    }
-    if (_compraCtrl.text.trim().isNotEmpty) {
-      datos['precio_compra'] = double.tryParse(_compraCtrl.text);
-    }
 
     try {
       await widget.servicio.guardar(datos);
@@ -521,6 +667,7 @@ class _FormularioPrecioState extends State<_FormularioPrecio> {
                   overflow: TextOverflow.ellipsis)),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close, color: Colors.white)),
             ]),
           ),
@@ -529,39 +676,12 @@ class _FormularioPrecioState extends State<_FormularioPrecio> {
           Padding(
             padding: const EdgeInsets.all(24),
             child: Form(key: _formKey, child: Column(children: [
-              // Precio de compra
-              TextFormField(
-                controller: _compraCtrl,
-                keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*\.?\d*')),
-                ],
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Precio de compra (Bs)',
-                  hintText: 'Ej: 6.00',
-                  prefixIcon: const Icon(Icons.shopping_cart_rounded,
-                      color: Colors.orange),
-                  prefixText: 'Bs ',
-                  helperText: 'Lo que se paga al proveedor por unidad',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                          color: Colors.orange, width: 2)),
-                ),
-                validator: (v) {
-                  final s = (v ?? '').trim();
-                  if (s.isEmpty) return null;
-                  final n = double.tryParse(s);
-                  if (n == null || n <= 0) {
-                    return 'Debe ser mayor a 0';
-                  }
-                  return null;
-                },
+              // Precio de compra: solo lectura, viene de Compras reales
+              _PanelPreciosCompra(
+                precioReferencia: _precioCompraRef,
+                proveedorReferencia: _proveedorRef,
+                preciosCompra:
+                    widget.item['precios_compra'] as List? ?? const [],
               ),
               const SizedBox(height: 16),
 
@@ -593,13 +713,12 @@ class _FormularioPrecioState extends State<_FormularioPrecio> {
                 ),
                 validator: (v) {
                   final s = (v ?? '').trim();
-                  if (s.isEmpty) return null;
+                  if (s.isEmpty) return 'El precio de venta es requerido';
                   final n = double.tryParse(s);
                   if (n == null || n <= 0) {
                     return 'Debe ser mayor a 0';
                   }
-                  // Validar que venta > compra
-                  final pc = double.tryParse(_compraCtrl.text);
+                  final pc = _precioCompraRef;
                   if (pc != null && n < pc) {
                     return 'El precio de venta no puede ser menor al de compra';
                   }
@@ -709,6 +828,81 @@ class _FormularioPrecioState extends State<_FormularioPrecio> {
           ),
         ]),
       ),
+    );
+  }
+}
+
+// ─── Panel de precios de compra (solo lectura, viene de Compras) ──────────────
+class _PanelPreciosCompra extends StatelessWidget {
+  final double? precioReferencia;
+  final String? proveedorReferencia;
+  final List preciosCompra;
+
+  const _PanelPreciosCompra({
+    required this.precioReferencia,
+    required this.proveedorReferencia,
+    required this.preciosCompra,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.3))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.shopping_cart_rounded,
+              color: Colors.orange, size: 18),
+          const SizedBox(width: 8),
+          const Text('Precio de compra',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.orange)),
+          const Spacer(),
+          Text(
+              precioReferencia != null
+                  ? 'Bs ${precioReferencia!.toStringAsFixed(2)}'
+                  : 'Sin compras aún',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: precioReferencia != null
+                      ? Colors.orange.shade800
+                      : ColoresCarolina.grisMedio)),
+        ]),
+        const SizedBox(height: 4),
+        Text(
+            precioReferencia != null
+                ? 'Último precio pagado'
+                    '${proveedorReferencia != null ? " a $proveedorReferencia" : ""}. '
+                    'Se registra solo al hacer una Compra, no se edita aquí.'
+                : 'Este precio se completa automáticamente cuando registres '
+                    'una Compra de este producto.',
+            style: const TextStyle(
+                fontSize: 11, color: ColoresCarolina.grisMedio)),
+        if (preciosCompra.length > 1) ...[
+          const Divider(height: 16),
+          const Text('Por proveedor:',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          ...preciosCompra.map((p) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(children: [
+                  Expanded(
+                      child: Text(p['proveedor'] ?? 'Sin proveedor',
+                          style: const TextStyle(fontSize: 12))),
+                  Text('Bs ${(p['precio'] as num).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                ]),
+              )),
+        ],
+      ]),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 
@@ -226,91 +227,129 @@ class _ClientesPantallaState extends State<ClientesPantalla> {
     );
   }
 
-  Widget _buildHeader() => Container(
-    padding: const EdgeInsets.fromLTRB(28, 22, 28, 18),
-    decoration: const BoxDecoration(color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
-    child: Row(children: [
-      Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Gestión de Clientes',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
-                  color: ColoresCarolina.celesteOscuro)),
-          const SizedBox(height: 6),
-          Row(children: [
-            _chip('${_clientes.length} total',  ColoresCarolina.celeste),
-            const SizedBox(width: 6),
-            _chip('$_totalActivos activos',     Colors.green),
-            const SizedBox(width: 6),
-            _chip('$_totalInactivos inactivos', Colors.grey),
-          ]),
-        ],
-      )),
-      ElevatedButton.icon(
-        onPressed: () => _abrirFormulario(),
-        icon: const Icon(Icons.person_add_rounded, size: 18),
-        label: const Text('Nuevo Cliente'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ColoresCarolina.celeste,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
-    ]),
-  );
-
-  Widget _buildBarra() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-    color: Colors.white,
-    child: Row(children: [
-      Expanded(child: TextField(
-        onChanged: (v) => setState(() => _busqueda = v),
-        decoration: InputDecoration(
-          hintText: 'Buscar por nombre, CI/NIT, teléfono o correo...',
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: ColoresCarolina.celeste),
-          suffixIcon: _busqueda.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18),
-                  onPressed: () => setState(() => _busqueda = ''))
-              : null,
-          filled: true, fillColor: const Color(0xFFF1F5F9),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
-                  color: ColoresCarolina.celeste, width: 1.5)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      )),
-      const SizedBox(width: 12),
-      Container(
-        decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(10)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _btnFiltro('Todos',     'todos',     Icons.people_rounded),
-          _btnFiltro('Activos',   'activos',   Icons.check_circle_rounded),
-          _btnFiltro('Inactivos', 'inactivos', Icons.cancel_rounded),
+  Widget _buildHeader() {
+    final movil = Breakpoints.esMovil(context);
+    final titulo = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Gestión de Clientes',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
+                color: ColoresCarolina.celesteOscuro)),
+        const SizedBox(height: 4),
+        const Text('Registra y administra la información de tus clientes.',
+            style: TextStyle(fontSize: 13, color: ColoresCarolina.grisMedio)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          _chip('${_clientes.length} total',  ColoresCarolina.celeste),
+          _chip('$_totalActivos activos',     Colors.green),
+          _chip('$_totalInactivos inactivos', Colors.grey),
         ]),
+      ],
+    );
+    final boton = ElevatedButton.icon(
+      onPressed: () => _abrirFormulario(),
+      icon: const Icon(Icons.person_add_rounded, size: 18),
+      label: const Text('Nuevo Cliente'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: ColoresCarolina.celeste,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10)),
       ),
-      const SizedBox(width: 8),
-      IconButton(
-        onPressed: _cargar,
-        icon: const Icon(Icons.refresh_rounded),
-        color: ColoresCarolina.celeste,
-        tooltip: 'Actualizar',
+    );
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(movil ? 16 : 28, 22, movil ? 16 : 28, 18),
+      decoration: const BoxDecoration(color: Colors.white,
+          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+      child: movil
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              titulo,
+              const SizedBox(height: 14),
+              boton,
+            ])
+          : Row(children: [
+              Expanded(child: titulo),
+              boton,
+            ]),
+    );
+  }
+
+  Widget _buildBarra() {
+    final movil = Breakpoints.esMovil(context);
+    final buscador = TextField(
+      onChanged: (v) => setState(() => _busqueda = v),
+      decoration: InputDecoration(
+        hintText: movil
+            ? 'Buscar cliente...'
+            : 'Buscar por nombre, CI/NIT, teléfono o correo...',
+        prefixIcon: const Icon(Icons.search_rounded,
+            color: ColoresCarolina.celeste),
+        suffixIcon: _busqueda.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear_rounded, size: 18),
+                tooltip: 'Limpiar búsqueda',
+                onPressed: () => setState(() => _busqueda = ''))
+            : null,
+        filled: true, fillColor: const Color(0xFFF1F5F9),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+                color: ColoresCarolina.celeste, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
       ),
-    ]),
-  );
+    );
+    final filtros = Container(
+      decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        _btnFiltro('Todos',     'todos',     Icons.people_rounded),
+        _btnFiltro('Activos',   'activos',   Icons.check_circle_rounded),
+        _btnFiltro('Inactivos', 'inactivos', Icons.cancel_rounded),
+      ]),
+    );
+    final refrescar = IconButton(
+      onPressed: _cargar,
+      icon: const Icon(Icons.refresh_rounded),
+      color: ColoresCarolina.celeste,
+      tooltip: 'Actualizar',
+    );
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: movil ? 16 : 28, vertical: 12),
+      color: Colors.white,
+      child: movil
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                buscador,
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [
+                    filtros,
+                    const SizedBox(width: 8),
+                    refrescar,
+                  ]),
+                ),
+              ])
+          : Row(children: [
+              Expanded(child: buscador),
+              const SizedBox(width: 12),
+              filtros,
+              const SizedBox(width: 8),
+              refrescar,
+            ]),
+    );
+  }
 
   Widget _btnFiltro(String label, String valor, IconData icono) {
     final sel = _filtroEstado == valor;
@@ -356,6 +395,23 @@ class _ClientesPantallaState extends State<ClientesPantalla> {
                   color: ColoresCarolina.grisMedio, fontSize: 15)),
         ],
       ));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final c = filtrados[i];
+          return _TarjetaCliente(
+            cliente:    c,
+            onVer:      () => _verDetalle(c),
+            onEditar:   () => _abrirFormulario(cliente: c),
+            onEstado:   () => _cambiarEstado(c),
+            onEliminar: () => _eliminar(c),
+          );
+        },
+      );
     }
 
     return SingleChildScrollView(
@@ -516,6 +572,111 @@ class _FilaCliente extends StatelessWidget {
       ]),
     );
   }
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) =>
+      Tooltip(message: tip,
+        child: InkWell(onTap: fn, borderRadius: BorderRadius.circular(8),
+          child: Container(padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                  color: c.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Icon(i, size: 16, color: c))));
+}
+
+// ─── Tarjeta (vista móvil) ──────────────────────────────────────────────────────
+class _TarjetaCliente extends StatelessWidget {
+  final Map<String, dynamic> cliente;
+  final VoidCallback onVer, onEditar, onEstado, onEliminar;
+
+  const _TarjetaCliente({
+    required this.cliente, required this.onVer,
+    required this.onEditar, required this.onEstado,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activo = cliente['activo'] as bool? ?? false;
+    final nombre = cliente['nombre_completo'] as String? ?? '-';
+    final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : 'C';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: ColoresCarolina.celeste.withValues(alpha: 0.15),
+            child: Text(inicial,
+                style: const TextStyle(color: ColoresCarolina.celeste,
+                    fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(nombre,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              overflow: TextOverflow.ellipsis)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+                color: (activo ? Colors.green : Colors.grey)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20)),
+            child: Text(activo ? 'Activo' : 'Inactivo',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                    color: activo ? Colors.green : Colors.grey)),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 16, runSpacing: 8, children: [
+          _dato(Icons.badge_rounded, 'CI/NIT', cliente['ci_nit'] ?? '-'),
+          _dato(Icons.phone_outlined, 'Teléfono', cliente['telefono'] ?? '-'),
+          _dato(Icons.email_outlined, 'Correo', cliente['email'] ?? '-'),
+        ]),
+        const SizedBox(height: 12),
+        const Divider(height: 1, color: ColoresCarolina.borde),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          _btn(Icons.visibility_rounded, ColoresCarolina.celeste, 'Ver', onVer),
+          const SizedBox(width: 6),
+          _btn(Icons.edit_rounded, Colors.orange, 'Editar', onEditar),
+          const SizedBox(width: 6),
+          _btn(
+            activo ? Icons.person_off_rounded : Icons.person_rounded,
+            activo ? Colors.amber.shade700    : Colors.green,
+            activo ? 'Desactivar'             : 'Activar',
+            onEstado,
+          ),
+          const SizedBox(width: 6),
+          _btn(Icons.delete_rounded, ColoresCarolina.rojo, 'Eliminar', onEliminar),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _dato(IconData i, String label, String valor) => SizedBox(
+    width: 150,
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(i, size: 14, color: ColoresCarolina.grisMedio),
+      const SizedBox(width: 6),
+      Expanded(child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10,
+              color: ColoresCarolina.grisMedio)),
+          Text(valor, style: const TextStyle(fontSize: 12,
+              fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis),
+        ],
+      )),
+    ]),
+  );
 
   Widget _btn(IconData i, Color c, String tip, VoidCallback fn) =>
       Tooltip(message: tip,
@@ -801,8 +962,8 @@ class _FormularioClienteState extends State<_FormularioCliente> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Nombre + Apellido Paterno
-                  Row(children: [
-                    Expanded(child: _campo(
+                  _filaOColumna([
+                    _campo(
                       _nombreCtrl, 'Nombre(s) *',
                       Icons.person_outline,
                       validator: (v) {
@@ -811,9 +972,8 @@ class _FormularioClienteState extends State<_FormularioCliente> {
                         if (!_regexLetras.hasMatch(s)) return 'Solo letras';
                         return null;
                       },
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _campo(
+                    ),
+                    _campo(
                       _apPaternoCtrl, 'Ap. Paterno *',
                       Icons.badge_outlined,
                       validator: (v) {
@@ -822,7 +982,7 @@ class _FormularioClienteState extends State<_FormularioCliente> {
                         if (!_regexLetras.hasMatch(s)) return 'Solo letras';
                         return null;
                       },
-                    )),
+                    ),
                   ]),
                   const SizedBox(height: 14),
 
@@ -842,8 +1002,8 @@ class _FormularioClienteState extends State<_FormularioCliente> {
                   const SizedBox(height: 14),
 
                   // CI/NIT + Teléfono
-                  Row(children: [
-                    Expanded(child: TextFormField(
+                  _filaOColumna([
+                    TextFormField(
                       controller: _ciNitCtrl,
                       maxLength: 20,
                       inputFormatters: [
@@ -860,9 +1020,8 @@ class _FormularioClienteState extends State<_FormularioCliente> {
                         }
                         return null;
                       },
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: TextFormField(
+                    ),
+                    TextFormField(
                       controller: _telefonoCtrl,
                       maxLength: 15,
                       keyboardType: TextInputType.phone,
@@ -880,7 +1039,7 @@ class _FormularioClienteState extends State<_FormularioCliente> {
                         }
                         return null;
                       },
-                    )),
+                    ),
                   ]),
                   const SizedBox(height: 14),
 
@@ -985,6 +1144,24 @@ class _FormularioClienteState extends State<_FormularioCliente> {
         ]),
       ),
     );
+  }
+
+  // En móvil apila los campos en columna; en tablet/escritorio los pone en fila.
+  Widget _filaOColumna(List<Widget> campos) {
+    if (Breakpoints.esMovil(context)) {
+      return Column(children: [
+        for (final c in campos) ...[
+          c,
+          if (c != campos.last) const SizedBox(height: 14),
+        ],
+      ]);
+    }
+    return Row(children: [
+      for (final c in campos) ...[
+        Expanded(child: c),
+        if (c != campos.last) const SizedBox(width: 12),
+      ],
+    ]);
   }
 
   InputDecoration _deco(String l, IconData i) => InputDecoration(

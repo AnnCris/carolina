@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
+import '../../constantes/breakpoints.dart';
 import '../../constantes/api.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
@@ -34,17 +35,25 @@ class ComprasServicio {
     throw Exception('Error al cargar productos');
   }
 
-  /// Carga el precio de compra registrado para un producto
-  Future<double?> obtenerPrecioCompra(int productoId) async {
+  /// Sugerencia de precio de compra para un producto: si se indica el
+  /// proveedor, prioriza el último precio pagado a ESE proveedor; si
+  /// no hay historial con él, sugiere el de cualquier otro (marcado
+  /// con mismoProveedor=false para que la UI lo aclare).
+  Future<({double precio, bool mismoProveedor})?> obtenerPrecioCompra(
+      int productoId, {int? proveedorId}) async {
     try {
       final res = await http.get(
-          Uri.parse(
-              '${ApiConfig.baseUrl}/precios/producto/$productoId/compra'),
+          Uri.parse(ApiConfig.precioCompra(productoId, proveedorId: proveedorId)),
           headers: await _h);
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final precio = data['precio'];
-        if (precio != null) return (precio as num).toDouble();
+        if (precio != null) {
+          return (
+            precio: (precio as num).toDouble(),
+            mismoProveedor: data['mismo_proveedor'] == true,
+          );
+        }
       }
     } catch (_) {}
     return null;
@@ -289,6 +298,7 @@ class _ComprasPantallaState extends State<ComprasPantalla> {
           suffixIcon: _busqueda.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'Limpiar búsqueda',
                   onPressed: () => setState(() => _busqueda = ''))
               : null,
           filled: true, fillColor: const Color(0xFFF1F5F9),
@@ -381,6 +391,24 @@ class _ComprasPantallaState extends State<ComprasPantalla> {
                   fontSize: 15)),
         ],
       ));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final c = filtrados[i];
+          return _TarjetaCompraMovil(
+            compra:      c,
+            colorEstado: _colorEstado(c['estado']),
+            iconoEstado: _iconoEstado(c['estado']),
+            onVer:       () => _verDetalle(c),
+            onEditar:    () => _abrirFormulario(compra: c),
+            onEliminar:  () => _eliminar(c),
+          );
+        },
+      );
     }
 
     return SingleChildScrollView(
@@ -555,6 +583,115 @@ class _FilaCompra extends StatelessWidget {
               child: Icon(i, size: 16, color: c))));
 }
 
+// ─── Tarjeta del historial (vista móvil) ───────────────────────────────────────
+class _TarjetaCompraMovil extends StatelessWidget {
+  final Map<String, dynamic> compra;
+  final Color colorEstado;
+  final IconData iconoEstado;
+  final VoidCallback onVer, onEditar, onEliminar;
+
+  const _TarjetaCompraMovil({
+    required this.compra,
+    required this.colorEstado,
+    required this.iconoEstado,
+    required this.onVer,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final detalles = compra['detalles'] as List? ?? [];
+    final fecha    = DateTime.tryParse(compra['fecha'] ?? '');
+    final fechaStr = fecha != null
+        ? '${fecha.day.toString().padLeft(2, '0')}/'
+          '${fecha.month.toString().padLeft(2, '0')}/'
+          '${fecha.year}'
+        : '-';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+                color: ColoresCarolina.celeste.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8)),
+            child: Text('#${compra['id']}',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: ColoresCarolina.celeste)),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+                color: colorEstado.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(iconoEstado, size: 12, color: colorEstado),
+              const SizedBox(width: 4),
+              Text((compra['estado'] ?? '-').toString().toUpperCase(),
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: colorEstado)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Text(compra['proveedor'] ?? '-',
+            style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                color: ColoresCarolina.textoFuerte),
+            overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 4),
+        Text('$fechaStr  •  ${detalles.length} producto(s)',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('Bs ${(compra['total'] ?? 0).toStringAsFixed(2)}',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: ColoresCarolina.celesteOscuro)),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            _btn(Icons.visibility_rounded, ColoresCarolina.celeste,
+                'Ver detalle', onVer),
+            const SizedBox(width: 6),
+            _btn(Icons.edit_rounded, Colors.orange, 'Editar', onEditar),
+            const SizedBox(width: 6),
+            _btn(Icons.delete_rounded, ColoresCarolina.rojo, 'Eliminar',
+                onEliminar),
+          ]),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) =>
+      Tooltip(message: tip,
+        child: InkWell(onTap: fn,
+            borderRadius: BorderRadius.circular(8),
+          child: Container(padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                  color: c.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Icon(i, size: 16, color: c))));
+}
+
 // ─── Detalle ──────────────────────────────────────────────────────────────────
 class _DetalleCompra extends StatelessWidget {
   final Map<String, dynamic> compra;
@@ -602,6 +739,7 @@ class _DetalleCompra extends StatelessWidget {
               const Spacer(),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close,
                       color: Colors.white)),
             ]),
@@ -1097,6 +1235,7 @@ class _FormularioCompraState extends State<_FormularioCompra> {
               const Spacer(),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close,
                       color: Colors.white)),
             ]),
@@ -1241,6 +1380,12 @@ class _FormularioCompraState extends State<_FormularioCompra> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 2),
+                        const Text(
+                            'Registra cada producto comprado, por unidad o por kg, y su precio',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: ColoresCarolina.grisMedio)),
                         const SizedBox(height: 10),
 
                         if (_items.isEmpty)
@@ -1262,10 +1407,11 @@ class _FormularioCompraState extends State<_FormularioCompra> {
 
                         ..._items.asMap().entries.map((e) =>
                             _ItemCompra(
-                              index:      e.key,
-                              item:       e.value,
-                              productos:  _productos,
-                              servicio:   widget.servicio,
+                              index:       e.key,
+                              item:        e.value,
+                              productos:   _productos,
+                              servicio:    widget.servicio,
+                              proveedorId: _proveedorId,
                               onEliminar: () =>
                                   _eliminarProducto(e.key),
                               onChanged:  () => setState(() {}),
@@ -1386,6 +1532,7 @@ class _ItemCompra extends StatefulWidget {
   final Map<String, dynamic> item;
   final List<dynamic>        productos;
   final ComprasServicio      servicio;
+  final int?                 proveedorId;
   final VoidCallback         onEliminar, onChanged;
 
   const _ItemCompra({
@@ -1393,6 +1540,7 @@ class _ItemCompra extends StatefulWidget {
     required this.item,
     required this.productos,
     required this.servicio,
+    required this.proveedorId,
     required this.onEliminar,
     required this.onChanged,
   });
@@ -1402,24 +1550,31 @@ class _ItemCompra extends StatefulWidget {
 }
 
 class _ItemCompraState extends State<_ItemCompra> {
+  bool _precioDeOtroProveedor = false;
 
   /// Cuando se selecciona un producto, carga su precio de compra
-  /// desde el módulo de precios y lo coloca en el campo
+  /// desde el historial de Compras (priorizando el proveedor actual)
+  /// y lo coloca en el campo — solo como sugerencia, se puede editar.
   Future<void> _cargarPrecioCompra(int productoId) async {
-    setState(() => widget.item['cargando_precio'] = true);
+    setState(() {
+      widget.item['cargando_precio'] = true;
+      _precioDeOtroProveedor = false;
+    });
     try {
-      final precio =
-          await widget.servicio.obtenerPrecioCompra(productoId);
-      if (precio != null && mounted) {
+      final sugerencia = await widget.servicio.obtenerPrecioCompra(
+          productoId, proveedorId: widget.proveedorId);
+      if (sugerencia != null && mounted) {
         final tipo = widget.item['tipo_precio'] as String;
         if (tipo == 'por_kg') {
           (widget.item['precio_kg'] as TextEditingController)
-              .text = precio.toStringAsFixed(2);
+              .text = sugerencia.precio.toStringAsFixed(2);
         } else {
           (widget.item['precio_unitario']
                   as TextEditingController)
-              .text = precio.toStringAsFixed(2);
+              .text = sugerencia.precio.toStringAsFixed(2);
         }
+        setState(() =>
+            _precioDeOtroProveedor = !sugerencia.mismoProveedor);
         widget.onChanged();
       }
     } finally {
@@ -1606,8 +1761,11 @@ class _ItemCompraState extends State<_ItemCompra> {
               decimal: true,
               hint: 'Ej: 8.50',
               helperText: cargandoPrecio
-                  ? 'Cargando precio del módulo de precios...'
-                  : 'Cargado automáticamente desde módulo de precios. Editable.',
+                  ? 'Buscando el último precio pagado...'
+                  : _precioDeOtroProveedor
+                      ? 'Sugerido de otro proveedor (sin historial con '
+                          'este). Verifica el precio.'
+                      : 'Último precio pagado a este proveedor. Editable.',
               validator: (v) =>
                   (double.tryParse(v ?? '') ?? 0) <= 0
                       ? 'Requerido' : null,
@@ -1634,8 +1792,10 @@ class _ItemCompraState extends State<_ItemCompra> {
                 decimal: true,
                 hint: 'Ej: 54.00',
                 helperText: cargandoPrecio
-                    ? 'Cargando precio...'
-                    : 'Desde módulo de precios. Editable.',
+                    ? 'Buscando el último precio pagado...'
+                    : _precioDeOtroProveedor
+                        ? 'Sugerido de otro proveedor. Verifica el precio.'
+                        : 'Último precio pagado a este proveedor. Editable.',
                 validator: (v) =>
                     (double.tryParse(v ?? '') ?? 0) <= 0
                         ? 'Requerido' : null,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/usuarios_servicio.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
@@ -193,12 +194,16 @@ Widget build(BuildContext context) {
           const Text('Gestión de Usuarios',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
                   color: ColoresCarolina.celesteOscuro)),
-          const SizedBox(height: 6),
-          Row(children: [
+          const SizedBox(height: 4),
+          const Text(
+              'Administra las cuentas del sistema, sus roles y '
+              'el acceso de cada empleado.',
+              style: TextStyle(
+                  fontSize: 13, color: ColoresCarolina.grisMedio)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: [
             _chip('${_todos.length} total',     ColoresCarolina.celeste),
-            const SizedBox(width: 6),
             _chip('$_totalActivos activos',     Colors.green),
-            const SizedBox(width: 6),
             _chip('$_totalInactivos inactivos', Colors.grey),
           ]),
         ],
@@ -229,6 +234,7 @@ Widget build(BuildContext context) {
           suffixIcon: _busqueda.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'Limpiar búsqueda',
                   onPressed: () => setState(() => _busqueda = ''))
               : null,
           filled: true,
@@ -314,6 +320,24 @@ Widget build(BuildContext context) {
           ),
         ],
       ));
+    }
+
+    // ── Vista móvil: tarjetas apiladas en vez de tabla ──────────────
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final u = filtrados[i];
+          return _TarjetaUsuarioMovil(
+            usuario:    u,
+            onVer:      () => _verDetalle(u),
+            onEditar:   () => _abrirFormulario(usuario: u),
+            onEstado:   () => _cambiarEstado(u),
+            onEliminar: () => _eliminar(u),
+          );
+        },
+      );
     }
 
     return SingleChildScrollView(
@@ -509,6 +533,150 @@ class _FilaUsuario extends StatelessWidget {
                 color: c.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8)),
             child: Icon(i, size: 16, color: c),
+          ),
+        ),
+      );
+}
+
+// ── Tarjeta móvil ─────────────────────────────────────────────────────────────
+class _TarjetaUsuarioMovil extends StatelessWidget {
+  final Map<String, dynamic> usuario;
+  final VoidCallback onVer, onEditar, onEstado, onEliminar;
+
+  const _TarjetaUsuarioMovil({
+    required this.usuario, required this.onVer,
+    required this.onEditar,  required this.onEstado,
+    required this.onEliminar,
+  });
+
+  Color get _cRol => _UsuariosPantallaState.colorRol(usuario['rol'] as String?);
+
+  ImageProvider? get _imgProvider {
+    final foto = usuario['foto'] as String?;
+    if (foto == null || foto.isEmpty) return null;
+    return NetworkImage(_UsuariosPantallaState.urlFoto(foto));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activo = usuario['activo'] as bool? ?? false;
+    final rol    = usuario['rol']    as String?;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: _cRol.withValues(alpha: 0.15),
+              backgroundImage: _imgProvider,
+              child: _imgProvider == null
+                  ? Text(
+                      (usuario['nombre'] as String? ?? 'U')[0].toUpperCase(),
+                      style: TextStyle(color: _cRol,
+                          fontWeight: FontWeight.bold, fontSize: 15))
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(usuario['nombre_completo'] ?? '',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 15),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 3),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                      width: 8, height: 8,
+                      decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: activo ? Colors.green : Colors.grey)),
+                  const SizedBox(width: 6),
+                  Text(activo ? 'Activo' : 'Inactivo',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: activo ? Colors.green : Colors.grey)),
+                ]),
+              ],
+            )),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: _cRol.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text((rol ?? '-').toUpperCase(),
+                  style: TextStyle(fontSize: 11,
+                      fontWeight: FontWeight.bold, color: _cRol)),
+            ),
+            if ((usuario['email'] as String?)?.isNotEmpty == true)
+              _dato(Icons.email_outlined, usuario['email']),
+          ]),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _accion(Icons.visibility_rounded,
+                  ColoresCarolina.celeste, 'Ver detalle', onVer),
+              const SizedBox(width: 6),
+              _accion(Icons.edit_rounded, Colors.orange, 'Editar', onEditar),
+              const SizedBox(width: 6),
+              _accion(
+                activo
+                    ? Icons.person_off_rounded
+                    : Icons.person_rounded,
+                activo ? Colors.amber.shade700 : Colors.green,
+                activo ? 'Desactivar' : 'Activar',
+                onEstado,
+              ),
+              const SizedBox(width: 6),
+              _accion(Icons.delete_rounded,
+                  ColoresCarolina.rojo, 'Eliminar', onEliminar),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dato(IconData icono, String? valor) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icono, size: 14, color: ColoresCarolina.grisMedio),
+      const SizedBox(width: 5),
+      Text(valor ?? '-',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+    ]),
+  );
+
+  Widget _accion(IconData i, Color c, String tip, VoidCallback fn) =>
+      Tooltip(
+        message: tip,
+        child: InkWell(
+          onTap: fn,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: c.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(i, size: 17, color: c),
           ),
         ),
       );
@@ -856,6 +1024,7 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
                 const Spacer(),
                 IconButton(
                     onPressed: () => Navigator.pop(context),
+                    tooltip: 'Cerrar',
                     icon: const Icon(Icons.close, color: Colors.white)),
               ]),
             ),
@@ -1049,6 +1218,9 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
                               icon: Icon(_verPass
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined),
+                              tooltip: _verPass
+                                  ? 'Ocultar contraseña'
+                                  : 'Mostrar contraseña',
                               onPressed: () => setState(
                                   () => _verPass = !_verPass),
                             ),

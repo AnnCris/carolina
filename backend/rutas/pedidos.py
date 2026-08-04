@@ -2,25 +2,29 @@ from flask import Blueprint, request, jsonify
 from extensions import db
 from modelos.pedido import Pedido, DetallePedido
 from utilidades.permisos import requiere_permiso, obtener_usuario_actual
-from datetime import datetime, date
- 
+from utilidades.tiempo import hoy_bolivia
+from utilidades.sincronizacion import (
+    StockInsuficiente, sincronizar_pedido_a_venta,
+)
+from datetime import datetime
+
 bp_pedidos = Blueprint('pedidos', __name__)
- 
+
 ESTADOS = ['pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado']
- 
- 
+
+
 @bp_pedidos.route('/pedidos', methods=['GET'])
 @requiere_permiso('pedidos')
 def listar():
     pedidos = Pedido.query.order_by(Pedido.fecha.desc()).all()
     return jsonify([p.to_dict() for p in pedidos])
- 
- 
+
+
 @bp_pedidos.route('/pedidos/hoy', methods=['GET'])
 @requiere_permiso('pedidos')
 def pedidos_hoy():
-    """Pedidos del día actual para imprimir la lista diaria."""
-    hoy = date.today()
+    """Pedidos del día actual (hora Bolivia) para imprimir la lista diaria."""
+    hoy = hoy_bolivia()
     pedidos = (Pedido.query
                .filter(db.func.date(Pedido.fecha) == hoy)
                .order_by(Pedido.cliente_id.asc())
@@ -135,7 +139,7 @@ def actualizar(id):
     if 'detalles' in datos and len(datos['detalles']) > 0:
         for det in p.detalles:
             db.session.delete(det)
- 
+
         for item in datos['detalles']:
             cantidad        = float(item.get('cantidad', 0))
             if cantidad <= 0:
@@ -145,6 +149,20 @@ def actualizar(id):
                 producto_id     = item['producto_id'],
                 cantidad        = cantidad,
             ))
+
+        # Si este pedido ya generó una venta, trasladarle los mismos
+        # productos/cantidades y reconciliar el inventario (revierte
+        # el stock de lo anterior y descuenta lo nuevo).
+        venta_activa = next(
+            (v for v in p.ventas if v.estado != 'anulada'), None)
+        if venta_activa:
+            usuario = obtener_usuario_actual()
+            try:
+                sincronizar_pedido_a_venta(
+                    p, venta_activa, datos['detalles'], usuario)
+            except StockInsuficiente as e:
+                return jsonify({'error': str(e)}), 422
+
     db.session.commit()
     return jsonify(p.to_dict())
  

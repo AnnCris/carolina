@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 
@@ -18,6 +19,13 @@ class ProveedoresServicio {
         Uri.parse(ApiConfig.proveedores), headers: await _h);
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Error al cargar proveedores (${res.statusCode})');
+  }
+
+  Future<List<dynamic>> listarProductos() async {
+    final res = await http.get(
+        Uri.parse(ApiConfig.productos), headers: await _h);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Error al cargar productos');
   }
 
   Future<Map<String, dynamic>> crear(
@@ -69,6 +77,7 @@ class ProveedoresPantalla extends StatefulWidget {
 class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
   final _servicio    = ProveedoresServicio();
   List<dynamic> _proveedores = [];
+  List<dynamic> _productos   = [];
   bool   _cargando           = true;
   String _busqueda           = '';
   String _filtroEstado       = 'todos';
@@ -79,8 +88,9 @@ class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final p = await _servicio.listar();
-      setState(() => _proveedores = p);
+      final p  = await _servicio.listar();
+      final pr = await _servicio.listarProductos();
+      setState(() { _proveedores = p; _productos = pr; });
     } catch (e) {
       if (mounted) {
         Notificacion.error(context,
@@ -217,6 +227,7 @@ class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
       barrierDismissible: false,
       builder: (_) => _FormularioProveedor(
         proveedor: proveedor,
+        productos: _productos,
         servicio:  _servicio,
         onGuardado: () {
           Navigator.pop(context);
@@ -255,13 +266,17 @@ class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
               style: TextStyle(fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: ColoresCarolina.celesteOscuro)),
-          const SizedBox(height: 6),
-          Row(children: [
+          const SizedBox(height: 4),
+          const Text(
+              'Registra y administra los proveedores que abastecen '
+              'a la distribuidora, sus datos de contacto y estado.',
+              style: TextStyle(
+                  fontSize: 13, color: ColoresCarolina.grisMedio)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: [
             _chip('${_proveedores.length} total',
                 ColoresCarolina.celeste),
-            const SizedBox(width: 6),
             _chip('$_totalActivos activos',  Colors.green),
-            const SizedBox(width: 6),
             _chip('$_totalInactivos inactivos', Colors.grey),
           ]),
         ],
@@ -297,6 +312,7 @@ class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
           suffixIcon: _busqueda.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'Limpiar búsqueda',
                   onPressed: () => setState(() => _busqueda = ''))
               : null,
           filled: true,
@@ -402,6 +418,24 @@ class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
       ));
     }
 
+    // ── Vista móvil: tarjetas apiladas en vez de tabla ──────────────
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final p = filtrados[i];
+          return _TarjetaProveedorMovil(
+            proveedor:  p,
+            onVer:      () => _verDetalle(p),
+            onEditar:   () => _abrirFormulario(proveedor: p),
+            onEstado:   () => _cambiarEstado(p),
+            onEliminar: () => _eliminar(p),
+          );
+        },
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Card(
@@ -422,6 +456,7 @@ class _ProveedoresPantallaState extends State<ProveedoresPantalla> {
                 _th('NIT',        2),
                 _th('TELÉFONO',   2),
                 _th('CONTACTO',   2),
+                _th('PRODUCTOS',  3),
                 _th('ESTADO',     2),
                 _th('ACCIONES',   3),
               ]),
@@ -537,6 +572,8 @@ class _FilaProveedor extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 13, color: Color(0xFF475569)),
             overflow: TextOverflow.ellipsis)),
+        // Productos que provee
+        Expanded(flex: 3, child: _celdaProductos(proveedor)),
         // Estado
         Expanded(flex: 2, child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -598,6 +635,164 @@ class _FilaProveedor extends StatelessWidget {
           ),
         ),
       );
+
+  Widget _celdaProductos(Map<String, dynamic> proveedor) {
+    final productos = (proveedor['productos'] as List?) ?? [];
+    if (productos.isEmpty) {
+      return const Text('—',
+          style: TextStyle(fontSize: 13, color: ColoresCarolina.grisMedio));
+    }
+    final nombres = productos.map((p) => p['nombre'] as String? ?? '').join(', ');
+    return Tooltip(
+      message: nombres,
+      child: Text(nombres,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+          overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+// ─── Tarjeta móvil ────────────────────────────────────────────────────────────
+class _TarjetaProveedorMovil extends StatelessWidget {
+  final Map<String, dynamic> proveedor;
+  final VoidCallback onVer, onEditar, onEstado, onEliminar;
+
+  const _TarjetaProveedorMovil({
+    required this.proveedor, required this.onVer,
+    required this.onEditar,  required this.onEstado,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activo  = proveedor['activo'] as bool? ?? false;
+    final nombre  = proveedor['nombre_completo'] as String? ?? '-';
+    final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : 'P';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.orange.withValues(alpha: 0.15),
+              child: Text(inicial,
+                  style: const TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(nombre,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 15),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 3),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                      width: 8, height: 8,
+                      decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: activo ? Colors.green : Colors.grey)),
+                  const SizedBox(width: 6),
+                  Text(activo ? 'Activo' : 'Inactivo',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: activo ? Colors.green : Colors.grey)),
+                ]),
+              ],
+            )),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            if ((proveedor['nit'] as String?)?.isNotEmpty == true)
+              _dato(Icons.receipt_rounded, 'NIT', proveedor['nit']),
+            if ((proveedor['telefono'] as String?)?.isNotEmpty == true)
+              _dato(Icons.phone_outlined, 'Tel.', proveedor['telefono']),
+            if ((proveedor['contacto'] as String?)?.isNotEmpty == true)
+              _dato(Icons.contact_phone_outlined, 'Contacto',
+                  proveedor['contacto']),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            const Icon(Icons.inventory_2_outlined, size: 14,
+                color: ColoresCarolina.grisMedio),
+            const SizedBox(width: 6),
+            Expanded(child: Text(
+                (() {
+                  final productos = (proveedor['productos'] as List?) ?? [];
+                  if (productos.isEmpty) return 'Sin productos vinculados';
+                  return productos.map((p) => p['nombre'] as String? ?? '')
+                      .join(', ');
+                })(),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                overflow: TextOverflow.ellipsis)),
+          ]),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _btn(Icons.visibility_rounded,
+                  ColoresCarolina.celeste, 'Ver', onVer),
+              const SizedBox(width: 6),
+              _btn(Icons.edit_rounded, Colors.orange, 'Editar', onEditar),
+              const SizedBox(width: 6),
+              _btn(
+                activo
+                    ? Icons.person_off_rounded
+                    : Icons.person_rounded,
+                activo ? Colors.amber.shade700 : Colors.green,
+                activo ? 'Desactivar' : 'Activar',
+                onEstado,
+              ),
+              const SizedBox(width: 6),
+              _btn(Icons.delete_rounded,
+                  ColoresCarolina.rojo, 'Eliminar', onEliminar),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dato(IconData icono, String label, String? valor) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icono, size: 14, color: ColoresCarolina.grisMedio),
+      const SizedBox(width: 5),
+      Text('$label: ${valor ?? "-"}',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+    ]),
+  );
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) => Tooltip(
+    message: tip,
+    child: InkWell(
+      onTap: fn,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8)),
+        child: Icon(i, size: 17, color: c),
+      ),
+    ),
+  );
 }
 
 // ─── Detalle ──────────────────────────────────────────────────────────────────
@@ -686,6 +881,59 @@ class _DetalleProveedor extends StatelessWidget {
                   'Contacto',    proveedor['contacto']         ?? '-'),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.inventory_2_outlined, size: 18,
+                          color: ColoresCarolina.celeste),
+                      const SizedBox(width: 12),
+                      const SizedBox(
+                          width: 110,
+                          child: Text('Productos',
+                              style: TextStyle(
+                                  color: ColoresCarolina.grisMedio,
+                                  fontSize: 13))),
+                    ]),
+                    const SizedBox(height: 8),
+                    if (((proveedor['productos'] as List?) ?? []).isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 30),
+                        child: Text('Sin productos vinculados',
+                            style: TextStyle(
+                                color: ColoresCarolina.grisMedio,
+                                fontSize: 12)),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: (proveedor['productos'] as List)
+                              .map((p) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: ColoresCarolina.celeste
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(20)),
+                                    child: Text(p['nombre'] ?? '',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: ColoresCarolina
+                                                .celesteOscuro,
+                                            fontWeight: FontWeight.w600)),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
                 child: Row(children: [
                   Icon(
                       activo
@@ -768,11 +1016,13 @@ class _DetalleProveedor extends StatelessWidget {
 // ─── Formulario ───────────────────────────────────────────────────────────────
 class _FormularioProveedor extends StatefulWidget {
   final Map<String, dynamic>? proveedor;
+  final List<dynamic>          productos;
   final ProveedoresServicio    servicio;
   final VoidCallback           onGuardado;
 
   const _FormularioProveedor({
     this.proveedor,
+    required this.productos,
     required this.servicio,
     required this.onGuardado,
   });
@@ -794,6 +1044,7 @@ class _FormularioProveedorState
   final _direccionCtrl = TextEditingController();
   final _contactoCtrl  = TextEditingController();
 
+  Set<int> _productoIds = {};
   bool _activo   = true;
   bool _cargando = false;
 
@@ -816,6 +1067,8 @@ class _FormularioProveedorState
       _direccionCtrl.text = p['direccion']        ?? '';
       _contactoCtrl.text  = p['contacto']         ?? '';
       _activo             = p['activo']            ?? true;
+      _productoIds        = ((p['producto_ids'] as List?) ?? [])
+          .map((e) => e as int).toSet();
     }
   }
 
@@ -842,6 +1095,7 @@ class _FormularioProveedorState
       'direccion':        _direccionCtrl.text.trim(),
       'contacto':         _contactoCtrl.text.trim(),
       'activo':           _activo,
+      'producto_ids':     _productoIds.toList(),
     };
 
     try {
@@ -904,6 +1158,7 @@ class _FormularioProveedorState
               const Spacer(),
               IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Cerrar',
                   icon: const Icon(Icons.close,
                       color: Colors.white)),
             ]),
@@ -1056,6 +1311,49 @@ class _FormularioProveedorState
                       return null;
                     },
                   ),
+                  const SizedBox(height: 14),
+
+                  // Productos que provee
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Productos que provee (opcional)',
+                        style: TextStyle(fontSize: 12.5,
+                            color: Colors.grey.shade700)),
+                  ),
+                  const SizedBox(height: 6),
+                  if (widget.productos.isEmpty)
+                    Text('No hay productos registrados todavía.',
+                        style: TextStyle(fontSize: 12.5,
+                            color: Colors.grey.shade600))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.productos.map((prod) {
+                        final id = prod['id'] as int;
+                        final seleccionado = _productoIds.contains(id);
+                        return FilterChip(
+                          label: Text(prod['nombre'] ?? ''),
+                          selected: seleccionado,
+                          selectedColor: ColoresCarolina.celeste.withValues(alpha: 0.15),
+                          checkmarkColor: ColoresCarolina.celeste,
+                          labelStyle: TextStyle(
+                              fontSize: 12.5,
+                              color: seleccionado
+                                  ? ColoresCarolina.celesteOscuro
+                                  : Colors.grey.shade800,
+                              fontWeight: seleccionado
+                                  ? FontWeight.w600 : FontWeight.normal),
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _productoIds.add(id);
+                            } else {
+                              _productoIds.remove(id);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
                   const SizedBox(height: 14),
 
                   // Estado activo

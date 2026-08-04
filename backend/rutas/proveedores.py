@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from extensions import db
 from modelos.proveedor import Proveedor
+from modelos.producto import Producto
 from utilidades.permisos import requiere_permiso
  
 bp_proveedores = Blueprint('proveedores', __name__)
@@ -58,6 +59,9 @@ def crear():
         contacto         = contacto  or None,
         activo           = True,
     )
+    producto_ids = datos.get('producto_ids')
+    if producto_ids:
+        p.productos = Producto.query.filter(Producto.id.in_(producto_ids)).all()
     db.session.add(p)
     db.session.commit()
     return jsonify(p.to_dict()), 201
@@ -101,7 +105,10 @@ def actualizar(id):
     if 'contacto' in datos:
         p.contacto = (datos['contacto'] or '').strip() or None
     if 'activo' in datos: p.activo = datos['activo']
- 
+    if 'producto_ids' in datos:
+        ids = datos['producto_ids'] or []
+        p.productos = Producto.query.filter(Producto.id.in_(ids)).all() if ids else []
+
     db.session.commit()
     return jsonify(p.to_dict())
  

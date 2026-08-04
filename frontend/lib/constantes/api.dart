@@ -19,7 +19,19 @@ class ApiConfig {
   static const String devoluciones='$baseUrl/devoluciones';
   static const String usuarios   = '$baseUrl/usuarios';
   static const String precios = '$baseUrl/precios';
-  static String precioCompra(int productoId) =>
-    '$baseUrl/precios/producto/$productoId/compra';
-  
+  static String precioCompra(int productoId, {int? proveedorId}) =>
+    '$baseUrl/precios/producto/$productoId/compra'
+    '${proveedorId != null ? '?proveedor_id=$proveedorId' : ''}';
+
+  static const String ventasPedidosPendientes =
+      '$baseUrl/ventas/pedidos-pendientes';
+  static String ventaDesdePedido(int pedidoId) =>
+      '$baseUrl/ventas/desde-pedido/$pedidoId';
+  static String ventaRecibo(int ventaId) =>
+      '$baseUrl/ventas/$ventaId/recibo';
+  static String ventaDetalle(int ventaId) =>
+      '$baseUrl/ventas/$ventaId';
+  static const String ventasHoy = '$baseUrl/ventas/hoy';
+  static String ventasPorFecha(String fecha) =>
+      '$baseUrl/ventas/fecha/$fecha';
 }

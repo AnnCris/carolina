@@ -1,5 +1,13 @@
 from extensions import db
- 
+
+# Tabla de asociación: qué proveedores abastecen qué productos (muchos a muchos,
+# independiente del historial real de Compras).
+proveedor_productos = db.Table(
+    'proveedor_productos',
+    db.Column('proveedor_id', db.Integer, db.ForeignKey('proveedores.id'), primary_key=True),
+    db.Column('producto_id', db.Integer, db.ForeignKey('productos.id'), primary_key=True),
+)
+
 class Proveedor(db.Model):
     __tablename__ = 'proveedores'
     id               = db.Column(db.Integer, primary_key=True)
@@ -12,7 +20,10 @@ class Proveedor(db.Model):
     direccion        = db.Column(db.Text)
     contacto         = db.Column(db.String(100))
     activo           = db.Column(db.Boolean, default=True)
- 
+
+    productos = db.relationship('Producto', secondary=proveedor_productos,
+                                 backref='proveedores')
+
     @property
     def nombre_completo(self):
         partes = [self.nombre]
@@ -35,5 +46,7 @@ class Proveedor(db.Model):
             'direccion':        self.direccion,
             'contacto':         self.contacto,
             'activo':           self.activo,
+            'productos':        [{'id': p.id, 'nombre': p.nombre} for p in self.productos],
+            'producto_ids':     [p.id for p in self.productos],
         }
  

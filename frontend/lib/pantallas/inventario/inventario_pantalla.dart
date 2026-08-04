@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../constantes/colores.dart';
 import '../../constantes/api.dart';
+import '../../constantes/breakpoints.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 
@@ -238,72 +239,94 @@ class _InventarioPantallaState extends State<InventarioPantalla> {
     ]);
   }
 
-  Widget _buildHeader() => Container(
-    padding: const EdgeInsets.fromLTRB(28, 22, 28, 18),
-    decoration: const BoxDecoration(color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
-    child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Gestión de Inventario',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
-                  color: ColoresCarolina.celesteOscuro)),
-          const SizedBox(height: 6),
-          Row(children: [
-            _chip('${_items.length} productos', ColoresCarolina.celeste),
-            const SizedBox(width: 6),
-            if (_totalCriticos > 0)
-              _chip('$_totalCriticos crítico(s)', Colors.orange),
-            const SizedBox(width: 6),
-            _chip('Método PEPS (FIFO)', Colors.purple),
-          ]),
-        ],
-      )),
-      IconButton(onPressed: _cargar, icon: const Icon(Icons.refresh_rounded),
-          color: ColoresCarolina.celeste, tooltip: 'Actualizar'),
-    ]),
-  );
+  Widget _buildHeader() {
+    final movil = Breakpoints.esMovil(context);
+    return Container(
+      padding: EdgeInsets.fromLTRB(movil ? 16 : 28, 22, movil ? 16 : 28, 18),
+      decoration: const BoxDecoration(color: Colors.white,
+          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+      child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Gestión de Inventario',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
+                    color: ColoresCarolina.celesteOscuro)),
+            const SizedBox(height: 4),
+            const Text(
+                'Controla el stock disponible y recibe alertas de niveles bajos o excedentes.',
+                style: TextStyle(fontSize: 13, color: ColoresCarolina.grisMedio)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              _chip('${_items.length} productos', ColoresCarolina.celeste),
+              if (_totalCriticos > 0)
+                _chip('$_totalCriticos crítico(s)', Colors.orange),
+              _chip('Método PEPS (FIFO)', Colors.purple),
+            ]),
+          ],
+        )),
+        IconButton(onPressed: _cargar, icon: const Icon(Icons.refresh_rounded),
+            color: ColoresCarolina.celeste, tooltip: 'Actualizar'),
+      ]),
+    );
+  }
 
-  Widget _buildBarra() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-    color: Colors.white,
-    child: Row(children: [
-      Expanded(child: TextField(
-        onChanged: (v) => setState(() => _busqueda = v),
-        decoration: InputDecoration(
-          hintText: 'Buscar por producto o categoría...',
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: ColoresCarolina.celeste),
-          suffixIcon: _busqueda.isNotEmpty
-              ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18),
-                  onPressed: () => setState(() => _busqueda = ''))
-              : null,
-          filled: true, fillColor: const Color(0xFFF1F5F9),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
-                  color: ColoresCarolina.celeste, width: 1.5)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      )),
-      const SizedBox(width: 12),
-      Container(
-        decoration: BoxDecoration(color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(10)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _btnFiltro('Todos',      'todos',      Icons.inventory_2_rounded),
-          _btnFiltro('Críticos',   'criticos',   Icons.warning_amber_rounded),
-          _btnFiltro('Normales',   'normales',   Icons.check_circle_rounded),
-          _btnFiltro('Sobrestock', 'sobrestock', Icons.arrow_upward_rounded),
-        ]),
+  Widget _buildBarra() {
+    final movil = Breakpoints.esMovil(context);
+    final buscador = TextField(
+      onChanged: (v) => setState(() => _busqueda = v),
+      decoration: InputDecoration(
+        hintText: 'Buscar por producto o categoría...',
+        prefixIcon: const Icon(Icons.search_rounded,
+            color: ColoresCarolina.celeste),
+        suffixIcon: _busqueda.isNotEmpty
+            ? IconButton(icon: const Icon(Icons.clear_rounded, size: 18),
+                tooltip: 'Limpiar búsqueda',
+                onPressed: () => setState(() => _busqueda = ''))
+            : null,
+        filled: true, fillColor: const Color(0xFFF1F5F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+                color: ColoresCarolina.celeste, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
       ),
-    ]),
-  );
+    );
+    final filtros = Container(
+      decoration: BoxDecoration(color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        _btnFiltro('Todos',      'todos',      Icons.inventory_2_rounded),
+        _btnFiltro('Críticos',   'criticos',   Icons.warning_amber_rounded),
+        _btnFiltro('Normales',   'normales',   Icons.check_circle_rounded),
+        _btnFiltro('Sobrestock', 'sobrestock', Icons.arrow_upward_rounded),
+      ]),
+    );
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: movil ? 16 : 28, vertical: 12),
+      color: Colors.white,
+      child: movil
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              buscador,
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: filtros,
+              ),
+            ])
+          : Row(children: [
+              Expanded(child: buscador),
+              const SizedBox(width: 12),
+              filtros,
+            ]),
+    );
+  }
 
   Widget _btnFiltro(String label, String valor, IconData icono) {
     final sel = _filtroEstado == valor;
@@ -346,6 +369,27 @@ class _InventarioPantallaState extends State<InventarioPantalla> {
                   color: ColoresCarolina.grisMedio, fontSize: 15)),
         ],
       ));
+    }
+
+    if (Breakpoints.esMovil(context)) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filtrados.length,
+        itemBuilder: (_, i) {
+          final item = filtrados[i];
+          return _TarjetaInventario(
+            item:          item,
+            colorEstado:   _colorEstado(item['estado_stock']),
+            iconoEstado:   _iconoEstado(item['estado_stock']),
+            labelEstado:   _labelEstado(item['estado_stock']),
+            fmtStock:      _fmt,
+            onMovimientos: () => _abrirMovimientos(item),
+            onAjuste:      () => _abrirAjuste(item),
+            onMinimos:     () => _abrirMinimos(item),
+            onEliminar:    () => _eliminar(item),
+          );
+        },
+      );
     }
 
     return SingleChildScrollView(
@@ -506,6 +550,117 @@ class _FilaInventario extends StatelessWidget {
       ]),
     );
   }
+
+  Widget _btn(IconData i, Color c, String tip, VoidCallback fn) =>
+      Tooltip(message: tip,
+        child: InkWell(onTap: fn, borderRadius: BorderRadius.circular(8),
+          child: Container(padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(color: c.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Icon(i, size: 16, color: c))));
+}
+
+// ─── Tarjeta (vista móvil) ──────────────────────────────────────────────────────
+class _TarjetaInventario extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final Color colorEstado;
+  final IconData iconoEstado;
+  final String labelEstado;
+  final String Function(double) fmtStock;
+  final VoidCallback onMovimientos, onAjuste, onMinimos, onEliminar;
+
+  const _TarjetaInventario({
+    required this.item,        required this.colorEstado,
+    required this.iconoEstado, required this.labelEstado,
+    required this.fmtStock,    required this.onMovimientos,
+    required this.onAjuste,    required this.onMinimos,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stock  = (item['stock_actual'] as num).toDouble();
+    final minimo = (item['stock_minimo'] as num).toDouble();
+    final maximo = item['stock_maximo'] != null
+        ? (item['stock_maximo'] as num).toDouble() : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColoresCarolina.borde),
+        boxShadow: ColoresCarolina.sombraTarjeta(),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(item['producto'] ?? '-',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              const Text('PEPS · unidades',
+                  style: TextStyle(fontSize: 10, color: ColoresCarolina.grisMedio)),
+            ],
+          )),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+                color: colorEstado.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(iconoEstado, size: 12, color: colorEstado),
+              const SizedBox(width: 4),
+              Text(labelEstado, style: TextStyle(fontSize: 10,
+                  fontWeight: FontWeight.bold, color: colorEstado)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 16, runSpacing: 8, children: [
+          _dato('Categoría', item['categoria'] ?? '-'),
+          _dato('Stock', fmtStock(stock), color: colorEstado, negrita: true),
+          _dato('Mínimo', fmtStock(minimo)),
+          _dato('Máximo', maximo != null ? fmtStock(maximo) : '—'),
+        ]),
+        const SizedBox(height: 12),
+        const Divider(height: 1, color: ColoresCarolina.borde),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          _btn(Icons.history_rounded, ColoresCarolina.celeste,
+              'Movimientos', onMovimientos),
+          const SizedBox(width: 6),
+          _btn(Icons.tune_rounded, Colors.orange, 'Ajustar stock', onAjuste),
+          const SizedBox(width: 6),
+          _btn(Icons.settings_rounded, Colors.purple,
+              'Configurar alertas', onMinimos),
+          const SizedBox(width: 6),
+          _btn(Icons.delete_rounded, ColoresCarolina.rojo,
+              'Eliminar registro', onEliminar),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _dato(String label, String valor, {Color? color, bool negrita = false}) =>
+      SizedBox(
+        width: 120,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 10,
+                color: ColoresCarolina.grisMedio)),
+            Text(valor, style: TextStyle(
+                fontSize: 13,
+                fontWeight: negrita ? FontWeight.bold : FontWeight.w600,
+                color: color ?? const Color(0xFF475569)),
+                overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      );
 
   Widget _btn(IconData i, Color c, String tip, VoidCallback fn) =>
       Tooltip(message: tip,
