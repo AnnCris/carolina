@@ -15,7 +15,7 @@ class LoginPantalla extends StatefulWidget {
 
 class _LoginPantallaState extends State<LoginPantalla> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
+  final _usuarioCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _cargando = false;
   bool _verPassword = false;
@@ -37,13 +37,13 @@ class _LoginPantallaState extends State<LoginPantalla> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _cargando = true);
     try {
-      await AuthServicio().login(_emailCtrl.text.trim(), _passCtrl.text);
+      await AuthServicio().login(_usuarioCtrl.text.trim(), _passCtrl.text);
       if (mounted) {
         Notificacion.exito(context, '¡Bienvenido a Distribuidora Carolina!');
         Navigator.pushReplacementNamed(context, RutasApp.dashboard);
       }
     } catch (e) {
-      if (mounted) Notificacion.error(context, 'Correo o contraseña incorrectos');
+      if (mounted) Notificacion.error(context, 'Usuario o contraseña incorrectos');
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -128,14 +128,15 @@ class _LoginPantallaState extends State<LoginPantalla> {
                           key: _formKey,
                           child: Column(
                             children: [
-                              // Email
+                              // Usuario
                               TextFormField(
-                                controller: _emailCtrl,
-                                keyboardType: TextInputType.emailAddress,
+                                controller: _usuarioCtrl,
+                                keyboardType: TextInputType.text,
+                                autofillHints: const [AutofillHints.username],
                                 decoration: InputDecoration(
-                                  labelText: 'Correo electrónico',
-                                  hintText: 'ejemplo@carolina.bo',
-                                  prefixIcon: const Icon(Icons.email_outlined,
+                                  labelText: 'Nombre de usuario',
+                                  hintText: 'usuario.carolina',
+                                  prefixIcon: const Icon(Icons.person_outline,
                                       color: ColoresCarolina.celeste),
                                   filled: true,
                                   fillColor: Colors.white,
@@ -158,10 +159,7 @@ class _LoginPantallaState extends State<LoginPantalla> {
                                 ),
                                 validator: (v) {
                                   if (v == null || v.trim().isEmpty) {
-                                    return 'Ingresa tu correo';
-                                  }
-                                  if (!v.contains('@') || !v.contains('.')) {
-                                    return 'Correo inválido';
+                                    return 'Ingresa tu usuario';
                                   }
                                   return null;
                                 },

@@ -16,6 +16,8 @@ import '../pantallas/compras/compras_pantalla.dart';
 import '../pantallas/pedidos/pedidos_pantalla.dart';
 import '../pantallas/precios/precios_pantalla.dart';
 import '../pantallas/devoluciones/devoluciones_pantalla.dart';
+import '../pantallas/cobranzas/cobranzas_pantalla.dart';
+import '../pantallas/auditoria/auditoria_pantalla.dart';
 
 class RutasApp {
   static const String login        = '/';
@@ -33,6 +35,8 @@ class RutasApp {
   static const String categorias = '/categorias';
   static const String marcas     = '/marcas';
   static const String precios    = '/precios';
+  static const String cobranzas  = '/cobranzas';
+  static const String auditoria  = '/auditoria';
 
   static Map<String, WidgetBuilder> get rutas => {
     login:    (_) => const LoginPantalla(),
@@ -65,5 +69,9 @@ class RutasApp {
         titulo: 'Marcas', hijo: MarcasPantalla()),
     precios: (_) => const LayoutPrincipal(
         titulo: 'Precios', hijo: PreciosPantalla()),
+    cobranzas: (_) => const LayoutPrincipal(
+        titulo: 'Cobranzas', hijo: CobranzasPantalla()),
+    auditoria: (_) => const LayoutPrincipal(
+        titulo: 'Auditoría', hijo: AuditoriaPantalla()),
   };
 }

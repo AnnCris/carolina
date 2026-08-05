@@ -19,7 +19,7 @@ class _RegistroPantallaState extends State<RegistroPantalla> {
   final _nombreCtrl = TextEditingController();
   final _apPaternoCtrl = TextEditingController();
   final _apMaternoCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
+  final _usuarioCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
   bool _verPass = false;
@@ -66,7 +66,7 @@ class _RegistroPantallaState extends State<RegistroPantalla> {
         nombre: _nombreCtrl.text.trim(),
         apellidoPaterno: _apPaternoCtrl.text.trim(),
         apellidoMaterno: _apMaternoCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
+        nombreUsuario: _usuarioCtrl.text.trim(),
         password: _passCtrl.text,
         foto: _foto,
       );
@@ -188,12 +188,12 @@ class _RegistroPantallaState extends State<RegistroPantalla> {
                           Icons.badge_outlined),
                       const SizedBox(height: 14),
 
-                      _campo(_emailCtrl, 'Correo electrónico', Icons.email_outlined,
-                          tipo: TextInputType.emailAddress,
+                      _campo(_usuarioCtrl, 'Nombre de usuario', Icons.person_outline,
                           validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'El correo es requerido';
-                        if (!v.contains('@') || !v.contains('.')) {
-                          return 'Correo inválido';
+                        final valor = (v ?? '').trim().toLowerCase();
+                        if (valor.isEmpty) return 'El nombre de usuario es requerido';
+                        if (!RegExp(r'^[a-z0-9._]{3,30}$').hasMatch(valor)) {
+                          return '3 a 30 caracteres: minúsculas, números, punto o guión bajo';
                         }
                         return null;
                       }),

@@ -3,22 +3,24 @@ from flask import Blueprint, request, jsonify, current_app
 from extensions import db
 from modelos.usuario import Usuario
 from modelos.rol import Rol
-import bcrypt, uuid, os
+import bcrypt, uuid, os, re
 
 bp_auth = Blueprint('auth', __name__)
+
+REGEX_USUARIO = re.compile(r'^[a-z0-9._]{3,30}$')
 
 @bp_auth.route('/login', methods=['POST'])
 def login():
     datos = request.get_json() or {}
-    email    = (datos.get('email')    or '').strip().lower()
-    password = (datos.get('password') or '').strip()
+    nombre_usuario = (datos.get('nombre_usuario') or '').strip().lower()
+    password       = (datos.get('password') or '').strip()
 
-    if not email or not password:
-        return jsonify({'error': 'Correo y contraseña son requeridos'}), 400
+    if not nombre_usuario or not password:
+        return jsonify({'error': 'Usuario y contraseña son requeridos'}), 400
 
-    usuario = Usuario.query.filter_by(email=email).first()
+    usuario = Usuario.query.filter_by(nombre_usuario=nombre_usuario).first()
     if not usuario:
-        return jsonify({'error': 'Correo o contraseña incorrectos'}), 401
+        return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
 
     hash_guardado = usuario.password_hash or ''
     if not (hash_guardado.startswith('$2b$') or hash_guardado.startswith('$2a$')):
@@ -33,7 +35,7 @@ def login():
         return jsonify({'error': f'Error al verificar: {str(e)}'}), 500
 
     if not pw_ok:
-        return jsonify({'error': 'Correo o contraseña incorrectos'}), 401
+        return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
 
     if not usuario.activo:
         return jsonify({'error': 'Usuario desactivado'}), 403
@@ -53,23 +55,24 @@ def registro():
     nombre           = (datos.get('nombre')           or '').strip()
     apellido_paterno = (datos.get('apellido_paterno') or '').strip()
     apellido_materno = (datos.get('apellido_materno') or '').strip()
-    email            = (datos.get('email')            or '').strip().lower()
+    nombre_usuario   = (datos.get('nombre_usuario')   or '').strip().lower()
     password         = (datos.get('password')         or '')
 
     if len(nombre) < 2:
         errores['nombre'] = 'El nombre es requerido'
     if len(apellido_paterno) < 2:
         errores['apellido_paterno'] = 'El apellido paterno es requerido'
-    if not email or '@' not in email:
-        errores['email'] = 'Correo inválido'
+    if not REGEX_USUARIO.match(nombre_usuario):
+        errores['nombre_usuario'] = ('3 a 30 caracteres: solo letras minúsculas, '
+                                      'números, punto o guión bajo')
     if len(password) < 8:
         errores['password'] = 'Mínimo 8 caracteres'
 
     if errores:
         return jsonify({'errores': errores}), 422
 
-    if Usuario.query.filter_by(email=email).first():
-        return jsonify({'errores': {'email': 'Este correo ya está registrado'}}), 422
+    if Usuario.query.filter_by(nombre_usuario=nombre_usuario).first():
+        return jsonify({'errores': {'nombre_usuario': 'Este nombre de usuario ya está en uso'}}), 422
 
     rol_vendedor = Rol.query.filter_by(nombre='vendedor').first()
     if not rol_vendedor:
@@ -81,7 +84,7 @@ def registro():
         nombre=nombre,
         apellido_paterno=apellido_paterno,
         apellido_materno=apellido_materno or None,
-        email=email,
+        nombre_usuario=nombre_usuario,
         password_hash=hash_pw,
         rol_id=rol_vendedor.id,
         activo=True

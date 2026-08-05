@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify, session, current_app
 from extensions import db
 from modelos.usuario import Usuario
 from utilidades.permisos import requiere_permiso
+from rutas.auth import REGEX_USUARIO
 import bcrypt, uuid, os
 
 bp_usuarios = Blueprint('usuarios', __name__)
@@ -28,15 +29,16 @@ def crear():
 
     nombre = (datos.get('nombre') or '').strip()
     apellido_paterno = (datos.get('apellido_paterno') or '').strip()
-    email = (datos.get('email') or '').strip()
+    nombre_usuario = (datos.get('nombre_usuario') or '').strip().lower()
     password = datos.get('password') or ''
 
     if len(nombre) < 2:
         errores['nombre'] = 'Mínimo 2 caracteres'
     if len(apellido_paterno) < 2:
         errores['apellido_paterno'] = 'El apellido paterno es requerido'
-    if not email or '@' not in email:
-        errores['email'] = 'Correo inválido'
+    if not REGEX_USUARIO.match(nombre_usuario):
+        errores['nombre_usuario'] = ('3 a 30 caracteres: solo letras minúsculas, '
+                                      'números, punto o guión bajo')
     if len(password) < 8:
         errores['password'] = 'Mínimo 8 caracteres'
     if not datos.get('rol_id'):
@@ -44,15 +46,15 @@ def crear():
     if errores:
         return jsonify({'errores': errores}), 422
 
-    if Usuario.query.filter_by(email=email).first():
-        return jsonify({'errores': {'email': 'Este correo ya está registrado'}}), 422
+    if Usuario.query.filter_by(nombre_usuario=nombre_usuario).first():
+        return jsonify({'errores': {'nombre_usuario': 'Este nombre de usuario ya está en uso'}}), 422
 
     hash_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     u = Usuario(
         nombre=nombre,
         apellido_paterno=apellido_paterno,
         apellido_materno=(datos.get('apellido_materno') or '').strip() or None,
-        email=email,
+        nombre_usuario=nombre_usuario,
         password_hash=hash_pw,
         rol_id=datos['rol_id'],
         activo=True
@@ -72,14 +74,21 @@ def actualizar(id):
         errores['nombre'] = 'Mínimo 2 caracteres'
     if 'apellido_paterno' in datos and len((datos['apellido_paterno'] or '').strip()) < 2:
         errores['apellido_paterno'] = 'Mínimo 2 caracteres'
-    if 'email' in datos and '@' not in (datos['email'] or ''):
-        errores['email'] = 'Correo inválido'
+    if 'nombre_usuario' in datos:
+        nu = (datos['nombre_usuario'] or '').strip().lower()
+        if not REGEX_USUARIO.match(nu):
+            errores['nombre_usuario'] = ('3 a 30 caracteres: solo letras minúsculas, '
+                                          'números, punto o guión bajo')
+        elif Usuario.query.filter(Usuario.nombre_usuario == nu, Usuario.id != u.id).first():
+            errores['nombre_usuario'] = 'Este nombre de usuario ya está en uso'
     if errores:
         return jsonify({'errores': errores}), 422
 
     u.nombre = (datos.get('nombre') or u.nombre).strip()
     u.apellido_paterno = (datos.get('apellido_paterno') or u.apellido_paterno).strip()
     u.apellido_materno = datos.get('apellido_materno', u.apellido_materno)
+    if 'nombre_usuario' in datos:
+        u.nombre_usuario = (datos['nombre_usuario'] or '').strip().lower()
     u.rol_id = datos.get('rol_id', u.rol_id)
     u.activo = datos.get('activo', u.activo)
 

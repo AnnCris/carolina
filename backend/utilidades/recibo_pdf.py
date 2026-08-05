@@ -97,7 +97,56 @@ def generar_recibo(venta):
         f'TOTAL: Bs {float(venta.total):.2f}',
         ParagraphStyle('Total', parent=estilos['Normal'], alignment=TA_RIGHT,
                         fontName='Helvetica-Bold', fontSize=13)))
-    elementos.append(Spacer(1, 10))
+    elementos.append(Spacer(1, 6))
+
+    # ── Pago de esta venta ──────────────────────────────────────────
+    metodos_legibles = {'efectivo': 'Efectivo', 'qr': 'QR', 'transferencia': 'Transferencia'}
+    pagado = venta.monto_pagado
+    saldo_esta_venta = venta.saldo_pendiente
+    if pagado > 0:
+        metodos_usados = ', '.join(sorted({
+            metodos_legibles.get(d.cobranza.metodo_pago, d.cobranza.metodo_pago)
+            for d in venta.detalles_cobranza if d.cobranza
+        }))
+        elementos.append(Paragraph(
+            f'Pagado: Bs {pagado:.2f}' + (f' ({metodos_usados})' if metodos_usados else ''),
+            negrita_dcha))
+    if saldo_esta_venta > 0:
+        elementos.append(Paragraph(
+            f'SALDO DE ESTA COMPRA: Bs {saldo_esta_venta:.2f}',
+            ParagraphStyle('SaldoVenta', parent=estilos['Normal'], alignment=TA_RIGHT,
+                            fontName='Helvetica-Bold', fontSize=10,
+                            textColor=colors.HexColor('#DC2626'))))
+    elementos.append(Spacer(1, 6))
+
+    # ── Otras cuentas pendientes del cliente ────────────────────────
+    if venta.cliente:
+        otras_pendientes = [
+            v for v in venta.cliente.ventas
+            if v.id != venta.id and v.estado != 'anulada' and v.saldo_pendiente > 0
+        ]
+        if otras_pendientes or saldo_esta_venta > 0:
+            elementos.append(Paragraph(
+                '<b>Cuentas pendientes del cliente</b>',
+                ParagraphStyle('TituloCuentas', parent=estilos['Normal'], fontSize=9)))
+            if saldo_esta_venta > 0:
+                elementos.append(Paragraph(
+                    f'• Nota {venta.numero_recibo} ({venta.fecha.strftime("%d/%m/%Y")}): '
+                    f'Bs {saldo_esta_venta:.2f}',
+                    ParagraphStyle('LineaCuenta', parent=estilos['Normal'], fontSize=8)))
+            total_otras = 0.0
+            for v in sorted(otras_pendientes, key=lambda v: v.fecha):
+                elementos.append(Paragraph(
+                    f'• Nota {v.numero_recibo} ({v.fecha.strftime("%d/%m/%Y")}): '
+                    f'Bs {v.saldo_pendiente:.2f}',
+                    ParagraphStyle('LineaCuenta', parent=estilos['Normal'], fontSize=8)))
+                total_otras += v.saldo_pendiente
+            elementos.append(Paragraph(
+                f'TOTAL QUE DEBE EL CLIENTE: Bs {(saldo_esta_venta + total_otras):.2f}',
+                ParagraphStyle('TotalDeuda', parent=estilos['Normal'], alignment=TA_RIGHT,
+                                fontName='Helvetica-Bold', fontSize=10,
+                                textColor=colors.HexColor('#DC2626'))))
+            elementos.append(Spacer(1, 8))
 
     if hay_precio_especial:
         elementos.append(Paragraph(

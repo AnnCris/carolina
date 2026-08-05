@@ -74,7 +74,9 @@ def reemplazar_detalles_venta(venta, nuevos_items, usuario):
     total = 0
     for item in nuevos_items:
         cantidad = float(item['cantidad'])
-        precio_unitario = float(item['precio_unitario'])
+        devolucion_id = item.get('devolucion_id')
+        # Producto de reemplazo por una devolución: siempre sin costo.
+        precio_unitario = 0.0 if devolucion_id else float(item['precio_unitario'])
         subtotal = cantidad * precio_unitario
 
         db.session.add(DetalleVenta(
@@ -85,6 +87,7 @@ def reemplazar_detalles_venta(venta, nuevos_items, usuario):
             subtotal=subtotal,
             peso_kg=item.get('peso_kg'),
             precio_editado=bool(item.get('precio_editado', False)),
+            devolucion_id=devolucion_id,
         ))
         total += subtotal
 
@@ -119,7 +122,12 @@ def sincronizar_pedido_a_venta(pedido, venta, nuevos_detalles_pedido, usuario):
     for item in nuevos_detalles_pedido:
         producto_id = item['producto_id']
         cantidad = float(item.get('cantidad', 0))
-        if producto_id in precios_actuales:
+        devolucion_id = item.get('devolucion_id')
+        if devolucion_id:
+            # Producto de reemplazo por devolución: siempre sin costo,
+            # sin importar el precio que tuviera cualquier línea previa.
+            precio, editado = 0.0, False
+        elif producto_id in precios_actuales:
             precio, editado = precios_actuales[producto_id]
         else:
             precio, editado = precio_venta_sugerido(producto_id), False
@@ -128,6 +136,7 @@ def sincronizar_pedido_a_venta(pedido, venta, nuevos_detalles_pedido, usuario):
             'cantidad': cantidad,
             'precio_unitario': precio,
             'precio_editado': editado,
+            'devolucion_id': devolucion_id,
         })
     reemplazar_detalles_venta(venta, nuevos_items_venta, usuario)
 
@@ -146,4 +155,5 @@ def sincronizar_venta_a_pedido(venta, nuevos_detalles_venta):
             pedido=pedido,
             producto_id=item['producto_id'],
             cantidad=float(item['cantidad']),
+            devolucion_id=item.get('devolucion_id'),
         ))

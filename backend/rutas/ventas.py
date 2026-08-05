@@ -4,6 +4,8 @@ from extensions import db
 from modelos.venta import Venta, DetalleVenta
 from modelos.inventario import Inventario, MovimientoInventario
 from modelos.pedido import Pedido
+from modelos.devolucion import Devolucion
+from modelos.cobranza import Cobranza, DetalleCobranza, METODOS_PAGO_VALIDOS
 from utilidades.permisos import requiere_permiso, obtener_usuario_actual
 from utilidades.recibo_pdf import generar_recibo
 from utilidades.tiempo import ahora_bolivia, hoy_bolivia
@@ -26,8 +28,9 @@ def _preparar_detalles_pedido(pedido):
             'producto_id':      d.producto_id,
             'producto':         d.producto.nombre if d.producto else None,
             'cantidad':         float(d.cantidad or 0),
-            'precio_unitario':  precio_venta_sugerido(d.producto_id),
+            'precio_unitario':  0.0 if d.devolucion_id else precio_venta_sugerido(d.producto_id),
             'stock_disponible': float(inv.stock_actual) if inv else 0,
+            'devolucion_id':    d.devolucion_id,
         })
     return detalles
 
@@ -117,6 +120,21 @@ def crear_venta():
         if not pedido:
             return jsonify({'error': 'El pedido indicado no existe'}), 404
 
+    # Validar el pago inicial (cuánto paga el cliente en el momento, si es
+    # que paga algo — puede ser 0 si queda todo a cuenta/fiado)
+    monto_pagado_inicial = datos.get('monto_pagado')
+    if monto_pagado_inicial is not None:
+        try:
+            monto_pagado_inicial = float(monto_pagado_inicial)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Monto pagado inválido'}), 422
+        if monto_pagado_inicial < 0:
+            return jsonify({'error': 'El monto pagado no puede ser negativo'}), 422
+        if monto_pagado_inicial > 0 and datos.get('metodo_pago') not in METODOS_PAGO_VALIDOS:
+            return jsonify({'error': 'Selecciona el método de pago (efectivo, QR o transferencia)'}), 422
+    else:
+        monto_pagado_inicial = 0.0
+
     # Validar stock disponible antes de tocar nada
     for item in datos['detalles']:
         cantidad = float(item.get('cantidad') or 0)
@@ -144,10 +162,16 @@ def crear_venta():
     venta.numero_recibo = str(venta.id).zfill(3)
 
     total = 0
+    devoluciones_a_resolver = set()
     for item in datos['detalles']:
         cantidad = float(item['cantidad'])
-        precio_unitario = float(item['precio_unitario'])
+        devolucion_id = item.get('devolucion_id')
+        # Producto de reemplazo por una devolución: siempre sin costo,
+        # sin importar lo que haya mandado el frontend.
+        precio_unitario = 0.0 if devolucion_id else float(item['precio_unitario'])
         subtotal = cantidad * precio_unitario
+        if devolucion_id:
+            devoluciones_a_resolver.add(devolucion_id)
 
         detalle = DetalleVenta(
             venta=venta,
@@ -157,6 +181,7 @@ def crear_venta():
             subtotal=subtotal,
             peso_kg=item.get('peso_kg'),
             precio_editado=bool(item.get('precio_editado', False)),
+            devolucion_id=devolucion_id,
         )
         db.session.add(detalle)
         total += subtotal
@@ -179,8 +204,34 @@ def crear_venta():
 
     venta.total = total - float(datos.get('descuento', 0))
 
+    # No se puede "pagar" más de lo que cuesta la venta al momento de crearla
+    monto_pagado_inicial = min(monto_pagado_inicial, float(venta.total))
+    if monto_pagado_inicial > 0:
+        cobranza_inicial = Cobranza(
+            cliente_id=venta.cliente_id,
+            usuario_id=usuario.id if usuario else None,
+            metodo_pago=datos.get('metodo_pago'),
+            monto_total=monto_pagado_inicial,
+            nota=f'Pago al momento de la venta {venta.numero_recibo}',
+            fecha=ahora_bolivia(),
+        )
+        db.session.add(cobranza_inicial)
+        db.session.flush()
+        db.session.add(DetalleCobranza(
+            cobranza_id=cobranza_inicial.id,
+            venta_id=venta.id,
+            monto=monto_pagado_inicial,
+        ))
+
     if pedido:
         pedido.estado = 'entregado'
+
+    for devolucion_id in devoluciones_a_resolver:
+        devolucion = Devolucion.query.get(devolucion_id)
+        if devolucion and devolucion.estado == 'pendiente':
+            devolucion.estado = 'resuelta'
+            devolucion.fecha_resolucion = ahora_bolivia()
+            devolucion.venta_resolucion_id = venta.id
 
     db.session.commit()
 
@@ -216,6 +267,16 @@ def actualizar_venta(id):
         # El pedido de origen (si existe) debe mostrar los mismos
         # productos/cantidades que la venta ya editada.
         sincronizar_venta_a_pedido(venta, datos['detalles'])
+
+        for item in datos['detalles']:
+            devolucion_id = item.get('devolucion_id')
+            if not devolucion_id:
+                continue
+            devolucion = Devolucion.query.get(devolucion_id)
+            if devolucion and devolucion.estado == 'pendiente':
+                devolucion.estado = 'resuelta'
+                devolucion.fecha_resolucion = ahora_bolivia()
+                devolucion.venta_resolucion_id = venta.id
 
         if 'descuento' in datos:
             total_sin_descuento = sum(float(d.subtotal) for d in venta.detalles)

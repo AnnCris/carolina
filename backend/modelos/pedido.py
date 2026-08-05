@@ -52,15 +52,19 @@ class DetallePedido(db.Model):
     pedido_id       = db.Column(db.Integer, db.ForeignKey('pedidos.id'))
     producto_id     = db.Column(db.Integer, db.ForeignKey('productos.id'))
     cantidad        = db.Column(db.Numeric(10, 2))
- 
+    # Si no es None, esta línea es un producto de reemplazo por esa
+    # devolución (se entrega sin costo, no es una venta nueva).
+    devolucion_id   = db.Column(db.Integer, db.ForeignKey('devoluciones.id'), nullable=True)
+
     producto = db.relationship('Producto')
- 
+
     def to_dict(self):
         return {
             'id':              self.id,
             'producto_id':     self.producto_id,
             'producto':        self.producto.nombre if self.producto else None,
             'cantidad':        float(self.cantidad or 0),
+            'devolucion_id':   self.devolucion_id,
         }
  
  

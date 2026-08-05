@@ -52,7 +52,9 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
       {'icono': Icons.local_shipping_rounded,    'titulo': 'Proveedores',  'ruta': RutasApp.proveedores,  'permiso': 'proveedores'},
       {'icono': Icons.receipt_long_rounded,      'titulo': 'Pedidos',      'ruta': RutasApp.pedidos,      'permiso': 'pedidos'},
       {'icono': Icons.assignment_return_rounded, 'titulo': 'Devoluciones', 'ruta': RutasApp.devoluciones, 'permiso': 'devoluciones'},
+      {'icono': Icons.account_balance_wallet_rounded, 'titulo': 'Cobranzas', 'ruta': RutasApp.cobranzas, 'permiso': 'cobranzas'},
       {'icono': Icons.manage_accounts_rounded,   'titulo': 'Usuarios',     'ruta': RutasApp.usuarios,     'permiso': 'todo'},
+      {'icono': Icons.history_rounded,           'titulo': 'Auditoría',    'ruta': RutasApp.auditoria,    'permiso': 'todo'},
     ];
 
     if (esAdmin) return todos;

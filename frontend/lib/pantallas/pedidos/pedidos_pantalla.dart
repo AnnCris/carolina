@@ -943,6 +943,7 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
   List<dynamic> _clientes      = [];
   List<dynamic> _productos     = [];
   List<dynamic> _devolucionesPendientes = [];
+  final Set<int> _devolucionesAResolver = {};
   int?          _clienteId;
   DateTime      _fechaEntrega  = DateTime.now();
   bool          _cargando      = false;
@@ -987,13 +988,17 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
         final detalles = p['detalles'] as List? ?? [];
         for (final d in detalles) {
           final cant = (d['cantidad'] as num).toDouble();
+          final devolucionId = d['devolucion_id'] as int?;
           _items.add({
             'producto_id': d['producto_id'],
             'cantidad':    TextEditingController(
                 text: cant % 1 == 0
                     ? cant.toStringAsFixed(0)
                     : cant.toStringAsFixed(2)),
+            'devolucion_id': devolucionId,
+            'es_reemplazo': devolucionId != null,
           });
+          if (devolucionId != null) _devolucionesAResolver.add(devolucionId);
         }
         setState(() {});
       }
@@ -1077,6 +1082,7 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
               (item['cantidad'] as TextEditingController)
                   .text) ??
           0,
+      if (item['devolucion_id'] != null) 'devolucion_id': item['devolucion_id'],
     }).toList();
 
     final datos = {
@@ -1375,6 +1381,35 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
             color: ColoresCarolina.celeste, width: 2)),
   );
 
+  void _toggleReemplazo(Map<String, dynamic> devolucion, bool marcar) {
+    final id = devolucion['id'] as int;
+    setState(() {
+      if (marcar) {
+        _devolucionesAResolver.add(id);
+        final detalles = (devolucion['detalles'] as List?) ?? [];
+        for (final det in detalles) {
+          final cant = (det['cantidad'] as num).toDouble();
+          _items.add({
+            'producto_id': det['producto_id'],
+            'cantidad': TextEditingController(
+                text: cant % 1 == 0 ? cant.toStringAsFixed(0) : cant.toStringAsFixed(2)),
+            'devolucion_id': id,
+            'es_reemplazo': true,
+          });
+        }
+      } else {
+        _devolucionesAResolver.remove(id);
+        _items.removeWhere((item) {
+          if (item['devolucion_id'] == id) {
+            (item['cantidad'] as TextEditingController).dispose();
+            return true;
+          }
+          return false;
+        });
+      }
+    });
+  }
+
   Widget _buildAvisoDevoluciones() {
     return Container(
       width: double.infinity,
@@ -1400,17 +1435,29 @@ class _FormularioPedidoState extends State<_FormularioPedido> {
             final motivo = kMotivosDevolucion[det['motivo']] ?? det['motivo'] ?? '';
             return '$cantStr ${det['producto']} ($motivo)';
           }).join(', ');
+          final incluida = _devolucionesAResolver.contains(d['id']);
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: Text('• $resumen',
-                style: const TextStyle(fontSize: 12.5, color: Color(0xFF7C4A03))),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Checkbox(
+                value: incluida,
+                activeColor: ColoresCarolina.celeste,
+                onChanged: (v) => _toggleReemplazo(d, v == true),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Text(resumen,
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF7C4A03))),
+                ),
+              ),
+            ]),
           );
         }),
         const Padding(
-          padding: EdgeInsets.only(top: 2),
+          padding: EdgeInsets.only(left: 4),
           child: Text(
-              'Recuerda llevar el producto de cambio y registrarlo como resuelto '
-              'cuando factures la venta.',
+              'Marca las que llevas para agregarlas al pedido como reemplazo (sin costo).',
               style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic)),
         ),
       ]),
@@ -1440,6 +1487,50 @@ class _ItemPedido extends StatefulWidget {
 class _ItemPedidoState extends State<_ItemPedido> {
   @override
   Widget build(BuildContext context) {
+    final esReemplazo = widget.item['es_reemplazo'] == true;
+
+    if (esReemplazo) {
+      final prod = widget.productos.firstWhere(
+          (p) => p['id'] == widget.item['producto_id'],
+          orElse: () => null);
+      final nombre = prod != null ? prod['nombre'] as String : 'Producto';
+      final cant = (widget.item['cantidad'] as TextEditingController).text;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.orange.withValues(alpha: 0.35))),
+        child: Row(children: [
+          Container(
+            width: 24, height: 24,
+            decoration: BoxDecoration(
+                color: ColoresCarolina.celeste.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6)),
+            child: Center(child: Text('${widget.index + 1}',
+                style: const TextStyle(fontWeight: FontWeight.bold,
+                    color: ColoresCarolina.celeste, fontSize: 11))),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text('$cant u. de $nombre',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20)),
+            child: const Text('REEMPLAZO',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold,
+                    color: Colors.orange)),
+          ),
+        ]),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(

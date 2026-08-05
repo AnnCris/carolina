@@ -19,6 +19,30 @@ class Venta(db.Model):
     usuario = db.relationship('Usuario', backref='ventas')
     pedido = db.relationship('Pedido', backref='ventas')
     detalles = db.relationship('DetalleVenta', backref='venta', lazy='dynamic')
+    # 'detalles_cobranza' llega por el backref definido en DetalleCobranza.venta
+    # (modelos/cobranza.py) — cada fila es cuánto de una Cobranza se aplicó
+    # a esta venta.
+
+    @property
+    def monto_pagado(self):
+        return sum(float(d.monto) for d in self.detalles_cobranza)
+
+    @property
+    def saldo_pendiente(self):
+        if self.estado == 'anulada':
+            return 0.0
+        saldo = float(self.total or 0) - self.monto_pagado
+        return round(saldo, 2) if saldo > 0.005 else 0.0
+
+    @property
+    def estado_pago(self):
+        pagado = self.monto_pagado
+        total = float(self.total or 0)
+        if pagado <= 0.005:
+            return 'pendiente'
+        if pagado + 0.005 >= total:
+            return 'pagado'
+        return 'parcial'
 
     def to_dict(self):
         return {
@@ -33,7 +57,19 @@ class Venta(db.Model):
             'estado': self.estado,
             'nota': self.nota,
             'numero_recibo': self.numero_recibo,
-            'detalles': [d.to_dict() for d in self.detalles]
+            'detalles': [d.to_dict() for d in self.detalles],
+            'monto_pagado': self.monto_pagado,
+            'saldo_pendiente': self.saldo_pendiente,
+            'estado_pago': self.estado_pago,
+            'pagos': [
+                {
+                    'monto': float(d.monto) if d.monto else 0,
+                    'metodo_pago': d.cobranza.metodo_pago if d.cobranza else None,
+                    'fecha': str(d.cobranza.fecha) if d.cobranza else None,
+                    'cobranza_id': d.cobranza_id,
+                }
+                for d in self.detalles_cobranza
+            ],
         }
 
 class DetalleVenta(db.Model):
@@ -46,6 +82,9 @@ class DetalleVenta(db.Model):
     subtotal = db.Column(db.Numeric(12, 2))
     peso_kg = db.Column(db.Numeric(10, 3))
     precio_editado = db.Column(db.Boolean, default=False)
+    # Si no es None, esta línea es el producto de reemplazo entregado por
+    # esa devolución (precio/subtotal siempre 0, no es una venta nueva).
+    devolucion_id = db.Column(db.Integer, db.ForeignKey('devoluciones.id'), nullable=True)
 
     producto = db.relationship('Producto', backref='detalles_venta')
 
@@ -58,4 +97,5 @@ class DetalleVenta(db.Model):
             'subtotal': float(self.subtotal),
             'peso_kg': float(self.peso_kg) if self.peso_kg else None,
             'precio_editado': bool(self.precio_editado),
+            'devolucion_id': self.devolucion_id,
         }

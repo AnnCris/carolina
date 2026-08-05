@@ -101,6 +101,7 @@ def crear():
             pedido          = p,
             producto_id     = item['producto_id'],
             cantidad        = cantidad,
+            devolucion_id   = item.get('devolucion_id'),
         ))
 
     db.session.commit()
@@ -148,6 +149,7 @@ def actualizar(id):
                 pedido          = p,
                 producto_id     = item['producto_id'],
                 cantidad        = cantidad,
+                devolucion_id   = item.get('devolucion_id'),
             ))
 
         # Si este pedido ya generó una venta, trasladarle los mismos

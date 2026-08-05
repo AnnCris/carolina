@@ -8,7 +8,7 @@ class Usuario(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     apellido_paterno = db.Column(db.String(100), nullable=False)
     apellido_materno = db.Column(db.String(100))
-    email = db.Column(db.String(150), unique=True, nullable=False)
+    nombre_usuario = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     rol_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
     foto = db.Column(db.String(255))
@@ -29,7 +29,7 @@ class Usuario(db.Model):
             'apellido_paterno': self.apellido_paterno,
             'apellido_materno': self.apellido_materno,
             'nombre_completo': self.nombre_completo,
-            'email': self.email,
+            'nombre_usuario': self.nombre_usuario,
             'rol': self.rol.nombre if self.rol else None,
             'rol_id': self.rol_id,
             'permisos': self.rol.permisos if self.rol else {},

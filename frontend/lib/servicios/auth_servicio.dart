@@ -9,13 +9,13 @@ class AuthServicio {
   static const String _tokenKey    = 'auth_token';
   static const String _usuarioKey  = 'usuario_data';
 
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String nombreUsuario, String password) async {
     try {
       final res = await http.post(
         Uri.parse(ApiConfig.login),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email.trim().toLowerCase(),
+          'nombre_usuario': nombreUsuario.trim().toLowerCase(),
           'password': password,
         }),
       );
@@ -37,7 +37,7 @@ class AuthServicio {
     required String nombre,
     required String apellidoPaterno,
     String? apellidoMaterno,
-    required String email,
+    required String nombreUsuario,
     required String password,
     XFile? foto,
   }) async {
@@ -49,7 +49,7 @@ class AuthServicio {
           'nombre': nombre.trim(),
           'apellido_paterno': apellidoPaterno.trim(),
           'apellido_materno': (apellidoMaterno ?? '').trim(),
-          'email': email.trim().toLowerCase(),
+          'nombre_usuario': nombreUsuario.trim().toLowerCase(),
           'password': password,
         }),
       );

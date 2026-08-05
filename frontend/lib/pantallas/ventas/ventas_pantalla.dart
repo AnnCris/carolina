@@ -11,6 +11,7 @@ import '../../constantes/api.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../widgets/notificacion.dart';
 import '../devoluciones/devoluciones_pantalla.dart' show kMotivosDevolucion;
+import '../cobranzas/cobranzas_pantalla.dart' show kMetodosPago;
 
 // ─── Servicio ─────────────────────────────────────────────────────────────────
 class VentasServicio {
@@ -99,10 +100,12 @@ class VentasServicio {
     return [];
   }
 
-  Future<void> resolverDevolucion(int id, int ventaId) async {
-    await http.post(Uri.parse('${ApiConfig.devoluciones}/$id/resolver'),
-        headers: await _h,
-        body: jsonEncode({'venta_resolucion_id': ventaId}));
+  Future<List<dynamic>> listarSaldosPendientes(int clienteId) async {
+    final res = await http.get(
+        Uri.parse(ApiConfig.cobranzasPendientesPorCliente(clienteId)),
+        headers: await _h);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    return [];
   }
 
   Future<Uint8List> obtenerReciboBytes(int ventaId) async {
@@ -558,6 +561,7 @@ class _VentasPantallaState extends State<VentasPantalla> {
                 _th('CLIENTE', 3),
                 _th('FECHA', 2),
                 _th('TOTAL', 2),
+                _th('PAGO', 2),
                 _th('ACCIONES', 3),
               ]),
             ),
@@ -604,6 +608,35 @@ class _VentasPantallaState extends State<VentasPantalla> {
             style:
                 TextStyle(fontSize: 11, color: c, fontWeight: FontWeight.w600)),
       );
+}
+
+// ─── Chip de estado de pago (compartido tabla/tarjeta/detalle) ─────────────────
+Widget chipEstadoPago(Map<String, dynamic> venta) {
+  final estado = venta['estado_pago'] as String? ?? 'pagado';
+  final saldo = (venta['saldo_pendiente'] as num?)?.toDouble() ?? 0;
+  Color color;
+  String texto;
+  switch (estado) {
+    case 'pendiente':
+      color = ColoresCarolina.rojo;
+      texto = 'Debe Bs ${saldo.toStringAsFixed(2)}';
+      break;
+    case 'parcial':
+      color = Colors.orange;
+      texto = 'Falta Bs ${saldo.toStringAsFixed(2)}';
+      break;
+    default:
+      color = ColoresCarolina.exito;
+      texto = 'Pagado';
+  }
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+    child: Text(texto,
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: color),
+        overflow: TextOverflow.ellipsis),
+  );
 }
 
 // ─── Fila del historial ────────────────────────────────────────────────────────
@@ -692,6 +725,7 @@ class _FilaVenta extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                     color: ColoresCarolina.celesteOscuro))),
+        Expanded(flex: 2, child: chipEstadoPago(venta)),
         Expanded(
             flex: 3,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -797,6 +831,8 @@ class _TarjetaVentaMovil extends StatelessWidget {
         const SizedBox(height: 4),
         Text(fechaStr,
             style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+        const SizedBox(height: 8),
+        if (!anulada) chipEstadoPago(venta),
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('Bs ${total.toStringAsFixed(2)}',
@@ -1050,9 +1086,12 @@ class _FormularioVentaState extends State<_FormularioVenta> {
   final _formKey = GlobalKey<FormState>();
   final _notaCtrl = TextEditingController();
   final _descuentoCtrl = TextEditingController(text: '0');
+  final _montoPagadoCtrl = TextEditingController(text: '0');
 
   bool _cargandoDatos = true;
   bool _guardando = false;
+  bool _pagoCompleto = true;
+  String _metodoPago = 'efectivo';
 
   List<dynamic> _clientes = [];
   List<dynamic> _productos = [];
@@ -1064,6 +1103,7 @@ class _FormularioVentaState extends State<_FormularioVenta> {
 
   List<dynamic> _devolucionesPendientes = [];
   final Set<int> _devolucionesAResolver = {};
+  List<dynamic> _saldosPendientes = [];
 
   bool get _esDesdePedido => widget.pedidoOrigen != null;
   bool get _esEdicion => widget.ventaOrigen != null;
@@ -1078,6 +1118,7 @@ class _FormularioVentaState extends State<_FormularioVenta> {
   void dispose() {
     _notaCtrl.dispose();
     _descuentoCtrl.dispose();
+    _montoPagadoCtrl.dispose();
     for (final item in _items) {
       (item['cantidadCtrl'] as TextEditingController).dispose();
       (item['precioCtrl'] as TextEditingController).dispose();
@@ -1093,13 +1134,17 @@ class _FormularioVentaState extends State<_FormularioVenta> {
         _clienteNombreFijo = p['cliente'] as String?;
         final detalles = p['detalles'] as List? ?? [];
         for (final d in detalles) {
+          final devolucionId = d['devolucion_id'] as int?;
+          final nombre = d['producto'] as String? ?? '-';
           _items.add(_crearItem(
             productoId: d['producto_id'] as int,
-            productoNombre: d['producto'] as String? ?? '-',
+            productoNombre: devolucionId != null ? '$nombre (Reemplazo)' : nombre,
             cantidad: (d['cantidad'] as num).toDouble(),
-            precio: (d['precio_unitario'] as num).toDouble(),
+            precio: devolucionId != null ? 0.0 : (d['precio_unitario'] as num).toDouble(),
             stockDisponible: (d['stock_disponible'] as num).toDouble(),
+            devolucionId: devolucionId,
           ));
+          if (devolucionId != null) _devolucionesAResolver.add(devolucionId);
         }
       } else {
         // Venta directa o edición: ambas necesitan clientes/productos/precios
@@ -1126,25 +1171,31 @@ class _FormularioVentaState extends State<_FormularioVenta> {
           for (final d in detalles) {
             final productoId = d['producto_id'] as int;
             final cantidad = (d['cantidad'] as num).toDouble();
+            final devolucionId = d['devolucion_id'] as int?;
             final prod = _productos.firstWhere((p) => p['id'] == productoId,
                 orElse: () => null);
             final stockCatalogo =
                 prod != null ? ((prod['stock'] as num?)?.toDouble() ?? 0) : 0.0;
+            final nombre = d['producto'] as String? ?? '-';
             _items.add(_crearItem(
               productoId: productoId,
-              productoNombre: d['producto'] as String? ?? '-',
+              productoNombre: devolucionId != null ? '$nombre (Reemplazo)' : nombre,
               cantidad: cantidad,
-              precio: (d['precio_unitario'] as num).toDouble(),
+              precio: devolucionId != null
+                  ? 0.0
+                  : (d['precio_unitario'] as num).toDouble(),
               stockDisponible: stockCatalogo + cantidad,
               precioEspecial: d['precio_editado'] == true,
               productoOriginalId: productoId,
               cantidadOriginal: cantidad,
+              devolucionId: devolucionId,
             ));
           }
         }
       }
       if (_clienteId != null && !_esEdicion) {
         await _cargarDevolucionesPendientes(_clienteId!);
+        await _cargarSaldosPendientes(_clienteId!);
       }
       setState(() => _cargandoDatos = false);
     } catch (e) {
@@ -1181,6 +1232,15 @@ class _FormularioVentaState extends State<_FormularioVenta> {
     }
   }
 
+  Future<void> _cargarSaldosPendientes(int clienteId) async {
+    try {
+      final lista = await widget.servicio.listarSaldosPendientes(clienteId);
+      if (mounted) setState(() => _saldosPendientes = lista);
+    } catch (_) {
+      // Aviso informativo: si falla, simplemente no se muestra el banner.
+    }
+  }
+
   Map<String, dynamic> _crearItem({
     required int productoId,
     required String productoNombre,
@@ -1190,6 +1250,7 @@ class _FormularioVentaState extends State<_FormularioVenta> {
     bool precioEspecial = false,
     int? productoOriginalId,
     double? cantidadOriginal,
+    int? devolucionId,
   }) {
     return {
       'producto_id': productoId,
@@ -1208,6 +1269,9 @@ class _FormularioVentaState extends State<_FormularioVenta> {
       // el descuento anterior antes de validar el nuevo).
       'producto_original_id': productoOriginalId,
       'cantidad_original': cantidadOriginal,
+      // Producto de reemplazo entregado por una devolución (sin costo).
+      'devolucion_id': devolucionId,
+      'es_reemplazo': devolucionId != null,
     };
   }
 
@@ -1309,7 +1373,8 @@ class _FormularioVentaState extends State<_FormularioVenta> {
       }
       final precio =
           double.tryParse((item['precioCtrl'] as TextEditingController).text);
-      if (precio == null || precio <= 0) {
+      final esReemplazo = item['es_reemplazo'] == true;
+      if (precio == null || (precio <= 0 && !esReemplazo)) {
         Notificacion.error(context, 'Precio inválido en algún producto');
         return;
       }
@@ -1317,6 +1382,18 @@ class _FormularioVentaState extends State<_FormularioVenta> {
     if (!_esDesdePedido && _clienteId == null) {
       Notificacion.error(context, 'Selecciona un cliente');
       return;
+    }
+    if (!_esEdicion && !_pagoCompleto) {
+      final n = double.tryParse(_montoPagadoCtrl.text.trim());
+      if (n == null || n < 0) {
+        Notificacion.error(context, 'Ingresa un monto pagado válido');
+        return;
+      }
+      if (n > _total + 0.01) {
+        Notificacion.error(context,
+            'El monto pagado no puede superar el total (Bs ${_total.toStringAsFixed(2)})');
+        return;
+      }
     }
 
     setState(() => _guardando = true);
@@ -1329,6 +1406,7 @@ class _FormularioVentaState extends State<_FormularioVenta> {
         'precio_unitario': double.parse(
             (item['precioCtrl'] as TextEditingController).text),
         'precio_editado': item['precio_especial'] == true,
+        if (item['devolucion_id'] != null) 'devolucion_id': item['devolucion_id'],
       };
     }).toList();
 
@@ -1338,6 +1416,8 @@ class _FormularioVentaState extends State<_FormularioVenta> {
       'descuento': double.tryParse(_descuentoCtrl.text) ?? 0,
       'nota': _notaParaGuardar(),
       'detalles': detalles,
+      if (!_esEdicion) 'monto_pagado': _montoPagadoFinal,
+      if (!_esEdicion && _montoPagadoFinal > 0) 'metodo_pago': _metodoPago,
     };
 
     try {
@@ -1345,16 +1425,8 @@ class _FormularioVentaState extends State<_FormularioVenta> {
           ? await widget.servicio
               .actualizarVenta(widget.ventaOrigen!['id'] as int, datos)
           : await widget.servicio.crear(datos);
-      if (!_esEdicion && _devolucionesAResolver.isNotEmpty) {
-        final ventaId = resultado['id'] as int;
-        for (final id in _devolucionesAResolver) {
-          try {
-            await widget.servicio.resolverDevolucion(id, ventaId);
-          } catch (_) {
-            // No bloquea el flujo de la venta si esto falla.
-          }
-        }
-      }
+      // La devolución se marca como resuelta automáticamente en el backend
+      // al guardar la venta (viene indicado en cada detalle con devolucion_id).
       widget.onGuardado(resultado);
     } catch (e) {
       if (mounted) {
@@ -1458,8 +1530,12 @@ class _FormularioVentaState extends State<_FormularioVenta> {
                                   _clienteId = v;
                                   _devolucionesPendientes = [];
                                   _devolucionesAResolver.clear();
+                                  _saldosPendientes = [];
                                 });
-                                if (v != null) _cargarDevolucionesPendientes(v);
+                                if (v != null) {
+                                  _cargarDevolucionesPendientes(v);
+                                  _cargarSaldosPendientes(v);
+                                }
                               },
                               validator: (v) =>
                                   v == null ? 'Selecciona un cliente' : null,
@@ -1467,6 +1543,10 @@ class _FormularioVentaState extends State<_FormularioVenta> {
                           if (_devolucionesPendientes.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             _buildAvisoDevoluciones(),
+                          ],
+                          if (_saldosPendientes.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildAvisoSaldo(),
                           ],
                           const SizedBox(height: 16),
                           Row(
@@ -1575,6 +1655,10 @@ class _FormularioVentaState extends State<_FormularioVenta> {
                               ),
                             ),
                           ]),
+                          if (!_esEdicion) ...[
+                            const SizedBox(height: 14),
+                            _buildSeccionPago(),
+                          ],
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _notaCtrl,
@@ -1642,6 +1726,146 @@ class _FormularioVentaState extends State<_FormularioVenta> {
             borderSide: const BorderSide(color: ColoresCarolina.celeste, width: 2)),
       );
 
+  void _toggleReemplazo(Map<String, dynamic> devolucion, bool marcar) {
+    final id = devolucion['id'] as int;
+    setState(() {
+      if (marcar) {
+        _devolucionesAResolver.add(id);
+        final detalles = (devolucion['detalles'] as List?) ?? [];
+        for (final det in detalles) {
+          _items.add(_crearItem(
+            productoId: det['producto_id'] as int,
+            productoNombre: '${det['producto']} (Reemplazo)',
+            cantidad: (det['cantidad'] as num).toDouble(),
+            precio: 0.0,
+            devolucionId: id,
+          ));
+        }
+      } else {
+        _devolucionesAResolver.remove(id);
+        _items.removeWhere((item) {
+          if (item['devolucion_id'] == id) {
+            (item['cantidadCtrl'] as TextEditingController).dispose();
+            (item['precioCtrl'] as TextEditingController).dispose();
+            return true;
+          }
+          return false;
+        });
+      }
+    });
+  }
+
+  double get _montoPagadoFinal =>
+      _pagoCompleto ? _total : (double.tryParse(_montoPagadoCtrl.text.trim()) ?? 0);
+
+  Widget _buildSeccionPago() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ColoresCarolina.celesteSuave,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.payments_outlined, size: 18, color: ColoresCarolina.celesteOscuro),
+          SizedBox(width: 8),
+          Text('Pago', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
+              color: ColoresCarolina.celesteOscuro)),
+        ]),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _pagoCompleto,
+          activeTrackColor: ColoresCarolina.celeste,
+          title: const Text('El cliente paga todo ahora', style: TextStyle(fontSize: 13)),
+          subtitle: Text(
+              _pagoCompleto
+                  ? 'Paga Bs ${_total.toStringAsFixed(2)}'
+                  : 'Paga una parte ahora; el resto queda a cuenta',
+              style: const TextStyle(fontSize: 11.5)),
+          onChanged: (v) => setState(() => _pagoCompleto = v),
+        ),
+        if (!_pagoCompleto) ...[
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _montoPagadoCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: _deco('Monto que paga ahora (Bs)', Icons.attach_money_rounded),
+            validator: (v) {
+              if (_pagoCompleto) return null;
+              final n = double.tryParse((v ?? '').trim());
+              if (n == null || n < 0) return 'Ingresa un monto válido';
+              if (n > _total + 0.01) {
+                return 'No puede pagar más del total (Bs ${_total.toStringAsFixed(2)})';
+              }
+              return null;
+            },
+          ),
+        ],
+        if (_montoPagadoFinal > 0) ...[
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: _metodoPago,
+            decoration: _deco('Método de pago', Icons.account_balance_wallet_outlined),
+            items: kMetodosPago.entries
+                .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                .toList(),
+            onChanged: (v) => setState(() => _metodoPago = v ?? 'efectivo'),
+          ),
+        ] else
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('Toda la venta queda a cuenta del cliente (fiado).',
+                style: TextStyle(fontSize: 11.5, color: ColoresCarolina.grisMedio,
+                    fontStyle: FontStyle.italic)),
+          ),
+      ]),
+    );
+  }
+
+  Widget _buildAvisoSaldo() {
+    final total = _saldosPendientes.fold<double>(
+        0.0, (acc, v) => acc + ((v['saldo_pendiente'] as num?)?.toDouble() ?? 0));
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ColoresCarolina.rojo.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: ColoresCarolina.rojo.withValues(alpha: 0.25)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.account_balance_wallet_outlined,
+              color: ColoresCarolina.rojo, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(
+              'Este cliente debe Bs ${total.toStringAsFixed(2)} de compras anteriores',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
+                  color: ColoresCarolina.rojo))),
+        ]),
+        const SizedBox(height: 6),
+        ..._saldosPendientes.map((v) {
+          final fecha = (v['fecha'] ?? '').toString();
+          final fechaStr = fecha.length >= 10 ? fecha.substring(0, 10) : fecha;
+          final saldo = (v['saldo_pendiente'] as num?)?.toDouble() ?? 0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text(
+                '• Nota ${v['numero_recibo'] ?? '-'} ($fechaStr): Bs ${saldo.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D))),
+          );
+        }),
+        const Padding(
+          padding: EdgeInsets.only(top: 2),
+          child: Text('Para cobrar estos saldos, ve a Cobranzas.',
+              style: TextStyle(fontSize: 11, color: ColoresCarolina.rojo,
+                  fontStyle: FontStyle.italic)),
+        ),
+      ]),
+    );
+  }
+
   Widget _buildAvisoDevoluciones() {
     return Container(
       width: double.infinity,
@@ -1674,13 +1898,7 @@ class _FormularioVentaState extends State<_FormularioVenta> {
               Checkbox(
                 value: incluida,
                 activeColor: ColoresCarolina.celeste,
-                onChanged: (v) => setState(() {
-                  if (v == true) {
-                    _devolucionesAResolver.add(d['id'] as int);
-                  } else {
-                    _devolucionesAResolver.remove(d['id'] as int);
-                  }
-                }),
+                onChanged: (v) => _toggleReemplazo(d, v == true),
               ),
               Expanded(
                 child: Padding(
@@ -1729,14 +1947,18 @@ class _ItemVenta extends StatelessWidget {
   Widget build(BuildContext context) {
     final precioEspecial = item['precio_especial'] == true;
     final stock = item['stock_disponible'] as double?;
+    final esReemplazo = item['es_reemplazo'] == true;
+    final efectivoSoloLectura = soloLectura || esReemplazo;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: esReemplazo ? Colors.orange.withValues(alpha: 0.06) : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE2E8F0))),
+          border: Border.all(color: esReemplazo
+              ? Colors.orange.withValues(alpha: 0.35)
+              : const Color(0xFFE2E8F0))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
@@ -1754,12 +1976,29 @@ class _ItemVenta extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: soloLectura
+            child: efectivoSoloLectura
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Text(item['producto_nombre'] as String? ?? '-',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)))
+                    child: Row(children: [
+                      Flexible(
+                        child: Text(item['producto_nombre'] as String? ?? '-',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 13),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                      if (esReemplazo) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20)),
+                          child: const Text('SIN COSTO',
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold,
+                                  color: Colors.orange)),
+                        ),
+                      ],
+                    ]))
                 : DropdownButtonFormField<int>(
                     initialValue: item['producto_id'] as int?,
                     decoration: InputDecoration(
@@ -1790,7 +2029,7 @@ class _ItemVenta extends StatelessWidget {
                     validator: (v) => v == null ? 'Selecciona un producto' : null,
                   ),
           ),
-          if (!soloLectura) ...[
+          if (!efectivoSoloLectura) ...[
             const SizedBox(width: 6),
             IconButton(
               onPressed: onEliminar,
@@ -1833,7 +2072,7 @@ class _ItemVenta extends StatelessWidget {
             flex: 2,
             child: TextFormField(
               controller: item['precioCtrl'] as TextEditingController,
-              enabled: precioEspecial || item['producto_id'] == null,
+              enabled: !esReemplazo && (precioEspecial || item['producto_id'] == null),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
@@ -1854,35 +2093,45 @@ class _ItemVenta extends StatelessWidget {
             ),
           ),
         ]),
-        const SizedBox(height: 4),
-        InkWell(
-          onTap: () => onPrecioEspecialCambiado(!precioEspecial),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              Switch(
-                value: precioEspecial,
-                onChanged: onPrecioEspecialCambiado,
-                activeTrackColor: ColoresCarolina.celeste,
-              ),
-              Expanded(
-                child: Text(
-                  precioEspecial
-                      ? 'Precio especial activado (venta por mayor u otra condición)'
-                      : 'Usar precio de catálogo',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: precioEspecial
-                          ? Colors.orange.shade800
-                          : ColoresCarolina.grisMedio,
-                      fontWeight:
-                          precioEspecial ? FontWeight.w600 : FontWeight.normal),
+        if (esReemplazo)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+                'Producto de reemplazo por devolución — no se cobra.',
+                style: TextStyle(fontSize: 11.5, color: Colors.orange,
+                    fontStyle: FontStyle.italic)),
+          )
+        else ...[
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () => onPrecioEspecialCambiado(!precioEspecial),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                Switch(
+                  value: precioEspecial,
+                  onChanged: onPrecioEspecialCambiado,
+                  activeTrackColor: ColoresCarolina.celeste,
                 ),
-              ),
-            ]),
+                Expanded(
+                  child: Text(
+                    precioEspecial
+                        ? 'Precio especial activado (venta por mayor u otra condición)'
+                        : 'Usar precio de catálogo',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: precioEspecial
+                            ? Colors.orange.shade800
+                            : ColoresCarolina.grisMedio,
+                        fontWeight:
+                            precioEspecial ? FontWeight.w600 : FontWeight.normal),
+                  ),
+                ),
+              ]),
+            ),
           ),
-        ),
+        ],
       ]),
     );
   }
@@ -1965,6 +2214,33 @@ class _DetalleVentaDialog extends StatelessWidget {
                           fontSize: 12,
                           fontStyle: FontStyle.italic,
                           color: ColoresCarolina.grisMedio)),
+                ],
+                if (venta['estado'] != 'anulada') ...[
+                  const SizedBox(height: 10),
+                  Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                    chipEstadoPago(venta),
+                    Text(
+                        'Pagado: Bs ${((venta['monto_pagado'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 12, color: ColoresCarolina.grisMedio)),
+                  ]),
+                  if (((venta['pagos'] as List?) ?? []).isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    ...((venta['pagos'] as List).map((p) {
+                      final metodo = kMetodosPago[p['metodo_pago']] ?? p['metodo_pago'] ?? '-';
+                      final f = (p['fecha'] ?? '').toString();
+                      final fStr = f.length >= 10 ? f.substring(0, 10) : f;
+                      return Text(
+                          '• Bs ${(p['monto'] as num).toStringAsFixed(2)} · $metodo · $fStr',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569)));
+                    })),
+                  ],
+                  if ((venta['saldo_pendiente'] as num? ?? 0) > 0) ...[
+                    const SizedBox(height: 4),
+                    const Text('Para registrar un pago de este saldo, ve a Cobranzas.',
+                        style: TextStyle(fontSize: 11, color: ColoresCarolina.grisMedio,
+                            fontStyle: FontStyle.italic)),
+                  ],
                 ],
                 const SizedBox(height: 14),
                 ...detalles.map((d) {

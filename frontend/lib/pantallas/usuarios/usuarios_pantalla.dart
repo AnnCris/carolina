@@ -46,9 +46,9 @@ class _UsuariosPantallaState extends State<UsuariosPantalla> {
       if (_filtroEstado == 'inactivos' &&  activo) return false;
       if (_busqueda.isEmpty) return true;
       final q = _busqueda.toLowerCase();
-      return (u['nombre_completo'] ?? '').toLowerCase().contains(q) ||
-             (u['email']          ?? '').toLowerCase().contains(q) ||
-             (u['rol']            ?? '').toLowerCase().contains(q);
+      return (u['nombre_completo']  ?? '').toLowerCase().contains(q) ||
+             (u['nombre_usuario']   ?? '').toLowerCase().contains(q) ||
+             (u['rol']              ?? '').toLowerCase().contains(q);
     }).toList();
   }
 
@@ -229,7 +229,7 @@ Widget build(BuildContext context) {
       Expanded(child: TextField(
         onChanged: (v) => setState(() => _busqueda = v),
         decoration: InputDecoration(
-          hintText: 'Buscar por nombre, correo o rol...',
+          hintText: 'Buscar por nombre, usuario o rol...',
           prefixIcon: const Icon(Icons.search_rounded, color: ColoresCarolina.celeste),
           suffixIcon: _busqueda.isNotEmpty
               ? IconButton(
@@ -358,7 +358,7 @@ Widget build(BuildContext context) {
                   horizontal: 20, vertical: 14),
               child: Row(children: [
                 _th('USUARIO',  4),
-                _th('CORREO',   3),
+                _th('NOMBRE DE USUARIO', 3),
                 _th('ROL',      2),
                 _th('ESTADO',   2),
                 _th('ACCIONES', 3),
@@ -465,8 +465,8 @@ class _FilaUsuario extends StatelessWidget {
             ],
           )),
         ])),
-        // Correo
-        Expanded(flex: 3, child: Text(usuario['email'] ?? '',
+        // Nombre de usuario
+        Expanded(flex: 3, child: Text(usuario['nombre_usuario'] ?? '',
             style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
             overflow: TextOverflow.ellipsis)),
         // Rol
@@ -622,8 +622,8 @@ class _TarjetaUsuarioMovil extends StatelessWidget {
                   style: TextStyle(fontSize: 11,
                       fontWeight: FontWeight.bold, color: _cRol)),
             ),
-            if ((usuario['email'] as String?)?.isNotEmpty == true)
-              _dato(Icons.email_outlined, usuario['email']),
+            if ((usuario['nombre_usuario'] as String?)?.isNotEmpty == true)
+              _dato(Icons.person_outline, usuario['nombre_usuario']),
           ]),
           const SizedBox(height: 12),
           Row(
@@ -765,8 +765,8 @@ class _DetalleUsuario extends StatelessWidget {
                   usuario['apellido_paterno'] ?? '-'),
               _f(Icons.badge_outlined,  'Ap. Materno',
                   usuario['apellido_materno'] ?? '-'),
-              _f(Icons.email_outlined,  'Correo',
-                  usuario['email']            ?? '-'),
+              _f(Icons.person_outline,  'Usuario',
+                  usuario['nombre_usuario']   ?? '-'),
               _f(Icons.shield_outlined, 'Rol',
                   (rol ?? '-').toUpperCase()),
               // Estado
@@ -865,7 +865,7 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
   final _nombreCtrl    = TextEditingController();
   final _apPaternoCtrl = TextEditingController();
   final _apMaternoCtrl = TextEditingController();
-  final _emailCtrl     = TextEditingController();
+  final _usuarioCtrl   = TextEditingController();
   final _passCtrl      = TextEditingController();
   final _servicio      = UsuariosServicio();
   final _auth          = AuthServicio();
@@ -898,7 +898,7 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
       _nombreCtrl.text    = u['nombre']           ?? '';
       _apPaternoCtrl.text = u['apellido_paterno'] ?? '';
       _apMaternoCtrl.text = u['apellido_materno'] ?? '';
-      _emailCtrl.text     = u['email']            ?? '';
+      _usuarioCtrl.text   = u['nombre_usuario']   ?? '';
       _rolId              = u['rol_id'] as int?;
       _activo             = u['activo'] as bool? ?? true;
     } else {
@@ -913,7 +913,7 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
     _nombreCtrl.dispose();
     _apPaternoCtrl.dispose();
     _apMaternoCtrl.dispose();
-    _emailCtrl.dispose();
+    _usuarioCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
@@ -935,7 +935,7 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
       'nombre':           _nombreCtrl.text.trim(),
       'apellido_paterno': _apPaternoCtrl.text.trim(),
       'apellido_materno': _apMaternoCtrl.text.trim(),
-      'email':            _emailCtrl.text.trim().toLowerCase(),
+      'nombre_usuario':   _usuarioCtrl.text.trim().toLowerCase(),
       'rol_id':           _rolId,
       'activo':           _activo,
     };
@@ -1121,14 +1121,13 @@ class _FormularioUsuarioState extends State<_FormularioUsuario> {
                       const SizedBox(height: 14),
 
                       _campo(
-                        _emailCtrl, 'Correo electrónico',
-                        Icons.email_outlined,
-                        tipo: TextInputType.emailAddress,
+                        _usuarioCtrl, 'Nombre de usuario',
+                        Icons.person_outline,
                         validator: (v) {
-                          final s = (v ?? '').trim();
+                          final s = (v ?? '').trim().toLowerCase();
                           if (s.isEmpty) return 'Requerido';
-                          if (!s.contains('@') || !s.contains('.')) {
-                            return 'Correo inválido';
+                          if (!RegExp(r'^[a-z0-9._]{3,30}$').hasMatch(s)) {
+                            return '3-30 caracteres: minúsculas, números, . o _';
                           }
                           return null;
                         },

@@ -19,6 +19,18 @@ class ApiConfig {
   static const String devoluciones='$baseUrl/devoluciones';
   static const String usuarios   = '$baseUrl/usuarios';
   static const String precios = '$baseUrl/precios';
+
+  static const String cobranzas            = '$baseUrl/cobranzas';
+  static const String cobranzasPendientes = '$baseUrl/cobranzas/pendientes';
+  static const String cobranzasResumen    = '$baseUrl/cobranzas/resumen';
+  static String cobranzaDetalle(int cobranzaId) =>
+      '$baseUrl/cobranzas/$cobranzaId';
+  static String cobranzasPorCliente(int clienteId) =>
+      '$baseUrl/cobranzas/cliente/$clienteId';
+  static String cobranzasPendientesPorCliente(int clienteId) =>
+      '$baseUrl/cobranzas/cliente/$clienteId/pendientes';
+  static String cobranzasHistorialPorCliente(int clienteId) =>
+      '$baseUrl/cobranzas/cliente/$clienteId/historial';
   static String precioCompra(int productoId, {int? proveedorId}) =>
     '$baseUrl/precios/producto/$productoId/compra'
     '${proveedorId != null ? '?proveedor_id=$proveedorId' : ''}';
@@ -34,4 +46,18 @@ class ApiConfig {
   static const String ventasHoy = '$baseUrl/ventas/hoy';
   static String ventasPorFecha(String fecha) =>
       '$baseUrl/ventas/fecha/$fecha';
+
+  static const String dashboardResumen = '$baseUrl/dashboard/resumen';
+  static String dashboardVentasSemana({int dias = 7, bool propias = false}) =>
+      '$baseUrl/dashboard/ventas-semana?dias=$dias&propias=$propias';
+  static String dashboardTopProductos({int dias = 30, int limite = 5}) =>
+      '$baseUrl/dashboard/top-productos?dias=$dias&limite=$limite';
+  static String dashboardMetodosPago({int dias = 30}) =>
+      '$baseUrl/dashboard/metodos-pago?dias=$dias';
+  static String dashboardTopDeudores({int limite = 5}) =>
+      '$baseUrl/dashboard/top-deudores?limite=$limite';
+
+  static const String auditoria        = '$baseUrl/auditoria';
+  static const String auditoriaModulos = '$baseUrl/auditoria/modulos';
+  static const String auditoriaResumen = '$baseUrl/auditoria/resumen';
 }

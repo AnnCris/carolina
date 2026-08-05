@@ -12,6 +12,7 @@ PERMISOS_ROL = {
         'pedidos':       True,
         'clientes':      True,
         'devoluciones':  True,
+        'cobranzas':     True,
         'productos_ver': True,  # solo ver productos, no editar
     },
     'almacenero': {
